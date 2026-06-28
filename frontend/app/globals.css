@@ -1,0 +1,102 @@
+:root {
+  --navy: #0b1829;
+  --navy-mid: #132338;
+  --navy-light: #1e344f;
+  --teal: #00c9a7;
+  --teal-dim: #00a88c;
+  --teal-pale: #e0fbf6;
+  --amber: #f59e0b;
+  --slate: #8496b0;
+  --white: #f8fafc;
+  --white-dim: #e2eaf4;
+  --red: #f87171;
+  --green: #4ade80;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  background: var(--navy);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--navy);
+  color: var(--white);
+  font-family: "Inter", sans-serif;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+::selection {
+  background: rgba(0, 201, 167, 0.28);
+  color: var(--white);
+}
+
+.hero-glow {
+  background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0, 201, 167, 0.08) 0%, transparent 70%);
+}
+
+.confidence-fill {
+  width: 0;
+  transition: width 1.2s ease;
+}
+
+.app-background {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(0, 201, 167, 0.07), transparent 24rem),
+    var(--navy);
+}
+
+.app-input::placeholder,
+.app-textarea::placeholder {
+  color: rgba(132, 150, 176, 0.7);
+}
+
+.app-input:focus,
+.app-textarea:focus,
+.app-select:focus {
+  border-color: rgba(0, 201, 167, 0.75);
+  box-shadow: 0 0 0 3px rgba(0, 201, 167, 0.1);
+  outline: none;
+}
+
+.app-select {
+  color-scheme: dark;
+}
+
+.app-select option {
+  background: var(--navy-mid);
+  color: var(--white);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

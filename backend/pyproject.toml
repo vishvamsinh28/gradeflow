@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gradeflow-api"
+version = "0.1.0"
+description = "FastAPI, Supabase, Gemini, LangGraph and LangSmith grading MVP"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.34,<1",
+  "pydantic>=2.10,<3",
+  "pydantic-settings>=2.7,<3",
+  "email-validator>=2.2,<3",
+  "supabase>=2.15,<3",
+  "bcrypt>=4.2,<5",
+  "PyJWT>=2.10,<3",
+  "python-multipart>=0.0.20,<1",
+  "google-genai>=1.20,<2",
+  "langgraph>=1.0,<2",
+  "langsmith>=0.4,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9",
+  "pytest-asyncio>=0.25,<1",
+  "httpx>=0.28,<1",
+  "ruff>=0.9,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
