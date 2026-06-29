@@ -7,11 +7,26 @@ import { Header } from "@/components/Header";
 import { api } from "@/lib/api";
 import { Classroom } from "@/lib/types";
 
-const exampleKey = JSON.stringify({ questions: [{ number: "1", prompt: "Solve 2x + 3 = 11", expected_answer: "x = 4", max_score: 5 }] }, null, 2);
-const exampleRubric = JSON.stringify({ general_rules: ["Award method marks for a correct approach."], questions: { "1": { criteria: [{ description: "Subtracts 3", points: 2 }, { description: "Divides by 2", points: 2 }, { description: "States x = 4", points: 1 }] } } }, null, 2);
+type QuestionDraft = {
+  number: string;
+  prompt: string;
+  expectedAnswer: string;
+  maxScore: string;
+  criteria: string;
+  commonMistakes: string;
+};
+
+const newQuestion = (number = "1"): QuestionDraft => ({
+  number,
+  prompt: "",
+  expectedAnswer: "",
+  maxScore: "5",
+  criteria: "",
+  commonMistakes: "",
+});
 
 const inputClass = "app-input w-full rounded-xl border border-[#8496b02e] bg-[#0B1829] px-4 py-3 text-sm text-[#F8FAFC]";
-const textareaClass = "app-textarea min-h-[150px] w-full resize-y rounded-xl border border-[#8496b02e] bg-[#0B1829] px-4 py-3 font-mono text-xs leading-6 text-[#E2EAF4]";
+const textareaClass = "app-textarea min-h-[96px] w-full resize-y rounded-xl border border-[#8496b02e] bg-[#0B1829] px-4 py-3 text-sm leading-6 text-[#E2EAF4]";
 const panelClass = "rounded-2xl border border-[#8496b01f] bg-[#132338] p-5 shadow-[0_18px_48px_rgba(0,0,0,.12)] sm:p-6";
 
 export default function ClassPage() {
@@ -20,9 +35,9 @@ export default function ClassPage() {
   const [data, setData] = useState<Classroom | null>(null);
   const [studentName, setStudentName] = useState("");
   const [title, setTitle] = useState("");
-  const [points, setPoints] = useState("5");
-  const [answerKey, setAnswerKey] = useState(exampleKey);
-  const [rubric, setRubric] = useState(exampleRubric);
+  const [description, setDescription] = useState("");
+  const [generalRules, setGeneralRules] = useState("Award method marks for a correct approach.\nDo not penalize the same arithmetic slip twice.");
+  const [questions, setQuestions] = useState<QuestionDraft[]>([newQuestion()]);
   const [error, setError] = useState("");
 
   async function load() {
@@ -53,15 +68,56 @@ export default function ClassPage() {
     event.preventDefault();
     setError("");
     try {
+      const cleanedQuestions = questions.map((question, index) => ({
+        ...question,
+        number: question.number.trim() || String(index + 1),
+        maxScore: question.maxScore || "0",
+      }));
+      const totalPoints = cleanedQuestions.reduce((sum, question) => sum + Number(question.maxScore || 0), 0);
+      const answerKey = {
+        questions: cleanedQuestions.map((question) => ({
+          number: question.number,
+          prompt: question.prompt,
+          expected_answer: question.expectedAnswer,
+          max_score: Number(question.maxScore || 0),
+          acceptable_alternates: [],
+        })),
+      };
+      const rubric = {
+        general_rules: generalRules.split("\n").map((rule) => rule.trim()).filter(Boolean),
+        questions: Object.fromEntries(
+          cleanedQuestions.map((question) => [
+            question.number,
+            {
+              criteria: question.criteria.split("\n").map((line) => line.trim()).filter(Boolean).map((description) => ({ description })),
+              common_mistakes: question.commonMistakes.split("\n").map((line) => line.trim()).filter(Boolean),
+            },
+          ])
+        ),
+      };
       await api(`/classes/${id}/assignments`, {
         method: "POST",
-        body: JSON.stringify({ title, total_points: Number(points), answer_key: JSON.parse(answerKey), rubric: JSON.parse(rubric), status: "active" }),
+        body: JSON.stringify({ title, description: description || null, total_points: totalPoints, answer_key: answerKey, rubric, status: "draft" }),
       });
       setTitle("");
+      setDescription("");
+      setQuestions([newQuestion()]);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Check that the JSON is valid");
+      setError(err instanceof Error ? err.message : "Could not create assignment");
     }
+  }
+
+  function updateQuestion(index: number, changes: Partial<QuestionDraft>) {
+    setQuestions((current) => current.map((question, questionIndex) => questionIndex === index ? { ...question, ...changes } : question));
+  }
+
+  function addQuestion() {
+    setQuestions((current) => [...current, newQuestion(String(current.length + 1))]);
+  }
+
+  function removeQuestion(index: number) {
+    setQuestions((current) => current.length === 1 ? current : current.filter((_, questionIndex) => questionIndex !== index));
   }
 
   async function deleteClass() {
@@ -165,29 +221,69 @@ export default function ClassPage() {
               <div className="mb-6">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">New grading workflow</div>
                 <h2 className="font-display text-2xl font-semibold">Create assignment</h2>
-                <p className="mt-1 text-sm text-[#8496B0]">Define the answer key and scoring rules the AI should follow.</p>
+                <p className="mt-1 text-sm text-[#8496B0]">Build the questions, answer key, and rubric without writing JSON.</p>
               </div>
-              <div className="grid gap-4 sm:grid-cols-[1fr_160px]">
+              <div className="grid gap-4 sm:grid-cols-[1fr_220px]">
                 <label className="block">
                   <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Title</span>
                   <input className={inputClass} required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Linear equations quiz" />
                 </label>
                 <label className="block">
                   <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Total points</span>
-                  <input className={inputClass} type="number" min="1" required value={points} onChange={(event) => setPoints(event.target.value)} />
+                  <input className={inputClass} readOnly value={questions.reduce((sum, question) => sum + Number(question.maxScore || 0), 0)} />
                 </label>
               </div>
-              <div className="mt-4 grid gap-4 xl:grid-cols-2">
-                <label className="block">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Answer key (JSON)</span>
-                  <textarea className={textareaClass} value={answerKey} onChange={(event) => setAnswerKey(event.target.value)} />
-                </label>
-                <label className="block">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Rubric (JSON)</span>
-                  <textarea className={textareaClass} value={rubric} onChange={(event) => setRubric(event.target.value)} />
-                </label>
+              <label className="mt-4 block">
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Description</span>
+                <textarea className={textareaClass} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Optional instructions, unit, or teacher notes" />
+              </label>
+              <label className="mt-4 block">
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">General grading rules</span>
+                <textarea className={textareaClass} value={generalRules} onChange={(event) => setGeneralRules(event.target.value)} />
+              </label>
+
+              <div className="mt-5 space-y-4">
+                {questions.map((question, index) => (
+                  <div className="rounded-xl border border-[#8496b01f] bg-[#0B1829] p-4" key={index}>
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <h3 className="font-display font-semibold">Question {index + 1}</h3>
+                      <button className="app-btn app-btn-danger app-btn-sm" onClick={() => removeQuestion(index)} type="button">Remove</button>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-[100px_1fr_140px]">
+                      <label className="block">
+                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">No.</span>
+                        <input className={inputClass} required value={question.number} onChange={(event) => updateQuestion(index, { number: event.target.value })} />
+                      </label>
+                      <label className="block">
+                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Prompt</span>
+                        <input className={inputClass} required value={question.prompt} onChange={(event) => updateQuestion(index, { prompt: event.target.value })} placeholder="Solve 2x + 3 = 11" />
+                      </label>
+                      <label className="block">
+                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Points</span>
+                        <input className={inputClass} min="1" required type="number" value={question.maxScore} onChange={(event) => updateQuestion(index, { maxScore: event.target.value })} />
+                      </label>
+                    </div>
+                    <div className="mt-4 grid gap-4 xl:grid-cols-3">
+                      <label className="block">
+                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Expected answer</span>
+                        <textarea className={textareaClass} required value={question.expectedAnswer} onChange={(event) => updateQuestion(index, { expectedAnswer: event.target.value })} />
+                      </label>
+                      <label className="block">
+                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Scoring criteria</span>
+                        <textarea className={textareaClass} value={question.criteria} onChange={(event) => updateQuestion(index, { criteria: event.target.value })} placeholder="One criterion per line" />
+                      </label>
+                      <label className="block">
+                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Common mistakes</span>
+                        <textarea className={textareaClass} value={question.commonMistakes} onChange={(event) => updateQuestion(index, { commonMistakes: event.target.value })} placeholder="One likely mistake per line" />
+                      </label>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <button className="app-btn app-btn-primary app-btn-lg mt-5">Create assignment</button>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button className="app-btn app-btn-secondary app-btn-lg" onClick={addQuestion} type="button">Add question</button>
+                <button className="app-btn app-btn-primary app-btn-lg">Create draft assignment</button>
+              </div>
             </form>
           </section>
 
@@ -207,7 +303,7 @@ export default function ClassPage() {
                 {data?.students?.map((student, index) => (
                   <div className="flex items-center gap-3 rounded-xl border border-[#8496b01a] bg-[#0B1829] px-3 py-3" key={student.id}>
                     <div className="grid h-8 w-8 place-items-center rounded-full bg-[#00c9a714] font-mono text-[11px] text-[#00C9A7]">{String(index + 1).padStart(2, "0")}</div>
-                    <span className="flex-1 text-sm text-[#E2EAF4]">{student.name}</span>
+                    <Link className="flex-1 text-sm text-[#E2EAF4] transition hover:text-[#00C9A7]" href={`/classes/${id}/students/${student.id}`}>{student.name}</Link>
                     <button
                       className="app-btn app-btn-danger app-btn-sm"
                       onClick={() => deleteStudent(student.id, student.name)}

@@ -33,7 +33,7 @@ create table if not exists public.assignments (
   total_points numeric not null check (total_points > 0),
   answer_key jsonb not null default '{}'::jsonb,
   rubric jsonb not null default '{}'::jsonb,
-  status text not null default 'draft' check (status in ('draft', 'active', 'archived')),
+  status text not null default 'draft' check (status in ('draft', 'active', 'archived', 'returned')),
   created_at timestamptz not null default now()
 );
 

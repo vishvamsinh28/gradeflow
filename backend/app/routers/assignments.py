@@ -3,7 +3,7 @@ from supabase import Client
 
 from app.db.supabase import get_supabase
 from app.dependencies import get_current_user, owned_assignment, owned_class
-from app.models.schemas import AssignmentCreate
+from app.models.schemas import AssignmentCreate, AssignmentStatusUpdate
 from app.services.storage import SubmissionStorage
 
 router = APIRouter(tags=["assignments"])
@@ -30,6 +30,38 @@ def get_assignment(
     assignment = owned_assignment(db, assignment_id, user["id"])
     students = db.table("students").select("*").eq("class_id", assignment["class_id"]).order("name").execute().data
     return {**assignment, "students": students}
+
+
+@router.patch("/assignments/{assignment_id}/status")
+def update_assignment_status(
+    assignment_id: str,
+    payload: AssignmentStatusUpdate,
+    user=Depends(get_current_user),
+    db: Client = Depends(get_supabase),
+):
+    owned_assignment(db, assignment_id, user["id"])
+    response = db.table("assignments").update({"status": payload.status}).eq("id", assignment_id).execute()
+    return response.data[0]
+
+
+@router.post("/assignments/{assignment_id}/duplicate", status_code=status.HTTP_201_CREATED)
+def duplicate_assignment(
+    assignment_id: str,
+    user=Depends(get_current_user),
+    db: Client = Depends(get_supabase),
+):
+    assignment = owned_assignment(db, assignment_id, user["id"])
+    payload = {
+        "class_id": assignment["class_id"],
+        "title": f"{assignment['title']} copy",
+        "description": assignment.get("description"),
+        "total_points": assignment["total_points"],
+        "answer_key": assignment["answer_key"],
+        "rubric": assignment["rubric"],
+        "status": "draft",
+    }
+    response = db.table("assignments").insert(payload).execute()
+    return response.data[0]
 
 
 @router.get("/assignments/{assignment_id}/submissions")

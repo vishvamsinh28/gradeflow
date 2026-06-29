@@ -14,6 +14,35 @@ router = APIRouter(prefix="/submissions", tags=["submissions"])
 logger = logging.getLogger(__name__)
 
 
+@router.get("/review-queue")
+def review_queue(user=Depends(get_current_user), db: Client = Depends(get_supabase)):
+    classes = db.table("classes").select("id,name").eq("owner_id", user["id"]).execute().data
+    if not classes:
+        return []
+    class_by_id = {row["id"]: row for row in classes}
+    assignments = db.table("assignments").select("id,title,class_id").in_("class_id", list(class_by_id)).execute().data
+    if not assignments:
+        return []
+    assignment_by_id = {row["id"]: row for row in assignments}
+    submissions = (
+        db.table("submissions")
+        .select("id,assignment_id,student_id,original_filename,status,score,max_score,confidence,review_required,students(name)")
+        .in_("assignment_id", list(assignment_by_id))
+        .eq("review_required", True)
+        .order("updated_at", desc=True)
+        .execute()
+        .data
+    )
+    return [
+        {
+            **submission,
+            "assignment": assignment_by_id[submission["assignment_id"]],
+            "classroom": class_by_id[assignment_by_id[submission["assignment_id"]]["class_id"]],
+        }
+        for submission in submissions
+    ]
+
+
 @router.get("/{submission_id}")
 def get_submission(
     submission_id: str,

@@ -10,6 +10,17 @@ import { Classroom, User } from "@/lib/types";
 const inputClass = "app-input w-full rounded-xl border border-[#8496b02e] bg-[#0B1829] px-4 py-3 text-sm text-[#F8FAFC]";
 const panelClass = "rounded-2xl border border-[#8496b01f] bg-[#132338] p-5 shadow-[0_18px_48px_rgba(0,0,0,.12)] sm:p-6";
 
+type ReviewQueueItem = {
+  id: string;
+  original_filename: string;
+  score?: number;
+  max_score?: number;
+  confidence?: number;
+  students?: { name: string };
+  assignment: { id: string; title: string };
+  classroom: { id: string; name: string };
+};
+
 export default function Dashboard() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -17,13 +28,19 @@ export default function Dashboard() {
   const [name, setName] = useState("");
   const [grade, setGrade] = useState("");
   const [subject, setSubject] = useState("Mathematics");
+  const [reviewQueue, setReviewQueue] = useState<ReviewQueueItem[]>([]);
   const [error, setError] = useState("");
 
   async function load() {
     try {
-      const [me, classRows] = await Promise.all([api<User>("/auth/me"), api<Classroom[]>("/classes")]);
+      const [me, classRows, reviewRows] = await Promise.all([
+        api<User>("/auth/me"),
+        api<Classroom[]>("/classes"),
+        api<ReviewQueueItem[]>("/submissions/review-queue"),
+      ]);
       setUser(me);
       setClasses(classRows);
+      setReviewQueue(reviewRows);
     } catch (err) {
       if (err instanceof Error && "status" in err && err.status === 401) {
         router.replace("/");
@@ -77,12 +94,44 @@ export default function Dashboard() {
             </h1>
             <p className="mt-3 max-w-2xl text-[#8496B0]">Create a classroom, add students, build assignments, and review AI-assisted grades.</p>
           </div>
-          <div className="rounded-xl border border-[#00c9a733] bg-[#00c9a70d] px-4 py-3 text-sm text-[#E2EAF4]">
-            <span className="font-mono text-[#00C9A7]">{classes.length}</span> active {classes.length === 1 ? "class" : "classes"}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <MiniMetric value={classes.length} label="Classes" />
+            <MiniMetric value={classes.reduce((sum, item) => sum + (item.assignments?.length ?? 0), 0)} label="Assignments" />
+            <MiniMetric value={reviewQueue.length} label="Need review" tone="amber" />
           </div>
         </div>
 
         {error && <div className="mb-6 rounded-xl border border-[#f8717159] bg-[#f8717112] px-4 py-3 text-sm text-[#FCA5A5]">{error}</div>}
+
+        <section className={`${panelClass} mb-6`}>
+          <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">Review queue</div>
+              <h2 className="font-display text-2xl font-semibold">Submissions needing your eyes</h2>
+              <p className="mt-1 text-sm text-[#8496B0]">Low-confidence grades across every class, ordered by most recent activity.</p>
+            </div>
+            <span className="w-fit rounded-full border border-[#f59e0b40] bg-[#f59e0b14] px-3 py-1.5 font-mono text-xs text-[#F59E0B]">{reviewQueue.length} pending</span>
+          </div>
+          {reviewQueue.length ? (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {reviewQueue.slice(0, 6).map((item) => (
+                <Link className="rounded-xl border border-[#8496b01f] bg-[#0B1829] p-4 transition hover:border-[#00c9a759]" href={`/submissions/${item.id}`} key={item.id}>
+                  <div className="text-xs text-[#8496B0]">{item.classroom.name} · {item.assignment.title}</div>
+                  <h3 className="mt-2 font-display font-semibold">{item.students?.name || item.original_filename}</h3>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-[#8496B0]">
+                    <span>{item.score != null ? `${item.score} / ${item.max_score}` : "Not scored"}</span>
+                    {item.confidence != null && <span>{Math.round(item.confidence * 100)}% confidence</span>}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-[#8496b033] bg-[#0B182966] p-6">
+              <h3 className="font-display font-semibold">Nothing needs review right now</h3>
+              <p className="mt-1 text-sm text-[#8496B0]">Upload and grade work; uncertain results will appear here automatically.</p>
+            </div>
+          )}
+        </section>
 
         <div className="grid items-start gap-6 lg:grid-cols-[1fr_360px]">
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -145,6 +194,15 @@ export default function Dashboard() {
           </form>
         </div>
       </main>
+    </div>
+  );
+}
+
+function MiniMetric({ value, label, tone = "teal" }: { value: number; label: string; tone?: "teal" | "amber" }) {
+  return (
+    <div className="rounded-xl border border-[#8496b01f] bg-[#132338] px-4 py-3 text-sm text-[#E2EAF4]">
+      <div className={`font-mono text-xl ${tone === "amber" ? "text-[#F59E0B]" : "text-[#00C9A7]"}`}>{value}</div>
+      <div className="text-[11px] text-[#8496B0]">{label}</div>
     </div>
   );
 }

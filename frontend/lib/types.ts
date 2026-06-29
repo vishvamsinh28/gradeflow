@@ -42,6 +42,7 @@ export type Submission = {
   feedback?: { summary?: string; teacher_action?: string; teacher_note?: string };
   students?: { name: string };
   student?: Student;
+  assignment?: Assignment;
   question_results?: QuestionResult[];
 };
 

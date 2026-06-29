@@ -83,3 +83,34 @@ def delete_student(
     if not student.data:
         return
     db.table("students").delete().eq("id", student_id).execute()
+
+
+@router.get("/{class_id}/students/{student_id}")
+def get_student(
+    class_id: str,
+    student_id: str,
+    user=Depends(get_current_user),
+    db: Client = Depends(get_supabase),
+):
+    classroom = owned_class(db, class_id, user["id"])
+    student = db.table("students").select("*").eq("id", student_id).eq("class_id", class_id).limit(1).execute().data
+    if not student:
+        return {"student": None, "classroom": classroom, "submissions": []}
+    assignments = db.table("assignments").select("id,title,total_points").eq("class_id", class_id).execute().data
+    assignment_by_id = {assignment["id"]: assignment for assignment in assignments}
+    submissions = (
+        db.table("submissions")
+        .select("id,assignment_id,original_filename,status,score,max_score,confidence,review_required,created_at")
+        .eq("student_id", student_id)
+        .order("created_at", desc=True)
+        .execute()
+        .data
+    )
+    return {
+        "student": student[0],
+        "classroom": classroom,
+        "submissions": [
+            {**submission, "assignment": assignment_by_id.get(submission["assignment_id"])}
+            for submission in submissions
+        ],
+    }

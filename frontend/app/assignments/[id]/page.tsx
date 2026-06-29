@@ -24,10 +24,11 @@ export default function AssignmentPage() {
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [studentName, setStudentName] = useState("");
   const [error, setError] = useState("");
   const [gradingId, setGradingId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState("all");
 
   async function load() {
     try {
@@ -50,14 +51,16 @@ export default function AssignmentPage() {
 
   async function upload(event: FormEvent) {
     event.preventDefault();
-    if (!file) return;
+    if (!files.length) return;
     setError("");
-    const body = new FormData();
-    body.append("file", file);
-    if (studentName.trim()) body.append("student_name", studentName.trim());
     try {
-      await api(`/assignments/${id}/submissions`, { method: "POST", body });
-      setFile(null);
+      for (const file of files) {
+        const body = new FormData();
+        body.append("file", file);
+        if (studentName.trim() && files.length === 1) body.append("student_name", studentName.trim());
+        await api(`/assignments/${id}/submissions`, { method: "POST", body });
+      }
+      setFiles([]);
       setStudentName("");
       await load();
     } catch (err) {
@@ -66,6 +69,9 @@ export default function AssignmentPage() {
   }
 
   const totalErrors = analytics?.common_errors?.reduce((sum, item) => sum + item.count, 0) ?? 0;
+  const filteredSubmissions = submissions.filter((submission) => statusFilter === "all" || submission.status === statusFilter);
+  const reviewCount = submissions.filter((submission) => submission.review_required || submission.status === "review_required").length;
+  const ungradedCount = submissions.filter((submission) => submission.status === "uploaded" || submission.status === "failed").length;
 
   async function grade(submissionId: string) {
     setError("");
@@ -102,6 +108,54 @@ export default function AssignmentPage() {
     }
   }
 
+  async function updateStatus(status: string) {
+    setError("");
+    try {
+      await api(`/assignments/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update assignment status");
+    }
+  }
+
+  async function duplicateAssignment() {
+    setError("");
+    try {
+      const copy = await api<Assignment>(`/assignments/${id}/duplicate`, { method: "POST" });
+      router.push(`/assignments/${copy.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not duplicate assignment");
+    }
+  }
+
+  async function gradeAllUngraded() {
+    const queue = submissions.filter((submission) => submission.status === "uploaded" || submission.status === "failed");
+    for (const submission of queue) {
+      await grade(submission.id);
+    }
+  }
+
+  function exportCsv() {
+    const rows = [
+      ["Student", "File", "Status", "Score", "Max score", "Confidence"],
+      ...submissions.map((submission) => [
+        submission.students?.name ?? "Unassigned",
+        submission.original_filename,
+        submission.status,
+        submission.score ?? "",
+        submission.max_score ?? "",
+        submission.confidence != null ? Math.round(submission.confidence * 100) + "%" : "",
+      ]),
+    ];
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${assignment?.title ?? "assignment"}-results.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="app-background min-h-screen">
       <Header />
@@ -115,6 +169,14 @@ export default function AssignmentPage() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <span className="w-fit rounded-full border border-[#00c9a733] bg-[#00c9a714] px-3 py-1.5 text-xs font-semibold capitalize text-[#00C9A7]">{assignment?.status || "active"}</span>
+            {assignment && (
+              <>
+                <button className="app-btn app-btn-secondary" onClick={() => updateStatus("active")} type="button">Open grading</button>
+                <button className="app-btn app-btn-ghost" onClick={() => updateStatus("returned")} type="button">Mark returned</button>
+                <button className="app-btn app-btn-ghost" onClick={duplicateAssignment} type="button">Duplicate</button>
+                <button className="app-btn app-btn-ghost" onClick={() => updateStatus("archived")} type="button">Archive</button>
+              </>
+            )}
             {assignment && (
               <button
                 className="app-btn app-btn-danger"
@@ -133,7 +195,21 @@ export default function AssignmentPage() {
           <MetricCard value={analytics?.submission_count ?? 0} label="Submissions" />
           <MetricCard value={analytics?.scored_count ?? 0} label="Scored" tone="teal" />
           <MetricCard value={`${analytics?.average_percentage ?? 0}%`} label="Class average" />
-          <MetricCard value={analytics?.review_required_count ?? 0} label="Need review" tone="amber" />
+          <MetricCard value={reviewCount} label="Need review" tone="amber" />
+        </section>
+
+        <section className={`${panelClass} mt-6`}>
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+            <div>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">Workflow queue</div>
+              <h2 className="font-display text-2xl font-semibold">Next actions</h2>
+              <p className="mt-1 text-sm leading-6 text-[#8496B0]">Grade new uploads, review uncertain work, then return results when you are ready.</p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <button className="app-btn app-btn-secondary" disabled={!ungradedCount || Boolean(gradingId)} onClick={gradeAllUngraded} type="button">Grade {ungradedCount || "all"} ungraded</button>
+              <button className="app-btn app-btn-ghost" disabled={!submissions.length} onClick={exportCsv} type="button">Export CSV</button>
+            </div>
+          </div>
         </section>
 
         <section className={`${panelClass} mt-6`}>
@@ -176,8 +252,20 @@ export default function AssignmentPage() {
               <div><h2 className="font-display text-2xl font-semibold">Submissions</h2><p className="mt-1 text-sm text-[#8496B0]">Open a submission for question-level feedback and teacher review.</p></div>
               <span className="font-mono text-xs text-[#8496B0]">{submissions.length} total</span>
             </div>
+            <div className="mb-4 flex flex-wrap gap-2">
+              {["all", "uploaded", "processing", "review_required", "completed", "failed"].map((status) => (
+                <button
+                  className={`app-btn app-btn-sm ${statusFilter === status ? "app-btn-secondary" : "app-btn-ghost"}`}
+                  key={status}
+                  onClick={() => setStatusFilter(status)}
+                  type="button"
+                >
+                  {status.replaceAll("_", " ")}
+                </button>
+              ))}
+            </div>
             <div className="space-y-3">
-              {submissions.map((submission) => (
+              {filteredSubmissions.map((submission) => (
                 <div className="flex flex-col justify-between gap-4 rounded-xl border border-[#8496b01f] bg-[#0B1829] p-4 md:flex-row md:items-center" key={submission.id}>
                   <div>
                     <Link href={`/submissions/${submission.id}`} className="font-display font-semibold transition hover:text-[#00C9A7]">
@@ -208,20 +296,21 @@ export default function AssignmentPage() {
                   </div>
                 </div>
               ))}
-              {!submissions.length && <div className="rounded-xl border border-dashed border-[#8496b033] bg-[#0B182966] p-8 text-center"><div className="text-3xl">📄</div><h3 className="mt-3 font-display font-semibold">No submissions uploaded</h3><p className="mt-1 text-sm text-[#8496B0]">Use the upload panel to add the first worksheet.</p></div>}
+              {!filteredSubmissions.length && <div className="rounded-xl border border-dashed border-[#8496b033] bg-[#0B182966] p-8 text-center"><div className="text-3xl">📄</div><h3 className="mt-3 font-display font-semibold">No submissions here</h3><p className="mt-1 text-sm text-[#8496B0]">Change the filter or upload work to continue.</p></div>}
             </div>
           </section>
 
           <aside className="space-y-6">
             <form className={panelClass} onSubmit={upload}>
-              <div className="mb-5"><div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">New submission</div><h2 className="font-display text-xl font-semibold">Upload work</h2></div>
+              <div className="mb-5"><div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">New submissions</div><h2 className="font-display text-xl font-semibold">Batch upload work</h2></div>
               <label className="block">
                 <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Student name</span>
                 <input
                   className={inputClass}
                   list="assignment-students"
+                  disabled={files.length > 1}
                   onChange={(event) => setStudentName(event.target.value)}
-                  placeholder="Type or choose a student"
+                  placeholder={files.length > 1 ? "Leave blank for batch upload" : "Type or choose a student"}
                   value={studentName}
                 />
                 <datalist id="assignment-students">
@@ -230,9 +319,9 @@ export default function AssignmentPage() {
               </label>
               <label className="mt-4 block">
                 <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Worksheet</span>
-                <input className={inputClass} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(event) => setFile(event.target.files?.[0] ?? null)} required />
+                <input className={inputClass} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple onChange={(event) => setFiles(Array.from(event.target.files ?? []))} required />
               </label>
-              <button className="app-btn app-btn-primary app-btn-full app-btn-lg mt-5">Upload submission</button>
+              <button className="app-btn app-btn-primary app-btn-full app-btn-lg mt-5">Upload {files.length > 1 ? `${files.length} submissions` : "submission"}</button>
             </form>
           </aside>
         </div>

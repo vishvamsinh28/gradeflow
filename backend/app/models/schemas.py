@@ -48,7 +48,11 @@ class AssignmentCreate(APIModel):
     total_points: float = Field(gt=0, le=10000)
     answer_key: dict[str, Any]
     rubric: dict[str, Any]
-    status: str = Field(default="active", pattern="^(draft|active|archived)$")
+    status: str = Field(default="draft", pattern="^(draft|active|archived|returned)$")
+
+
+class AssignmentStatusUpdate(APIModel):
+    status: str = Field(pattern="^(draft|active|archived|returned)$")
 
 
 class ReviewUpdate(APIModel):
