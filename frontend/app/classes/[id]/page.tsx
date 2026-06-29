@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { Header } from "@/components/Header";
 import { useToast } from "@/components/ToastProvider";
 import { api } from "@/lib/api";
@@ -33,6 +34,7 @@ const panelClass = "rounded-2xl border border-[#8496b01f] bg-[#132338] p-5 shado
 export default function ClassPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const confirm = useConfirm();
   const { notify } = useToast();
   const [data, setData] = useState<Classroom | null>(null);
   const [studentName, setStudentName] = useState("");
@@ -136,7 +138,13 @@ export default function ClassPage() {
   }
 
   async function deleteClass() {
-    if (!data || !window.confirm(`Delete "${data.name}" and everything inside it?`)) return;
+    if (!data) return;
+    const confirmed = await confirm({
+      title: `Delete ${data.name}?`,
+      message: "This removes the class, students, assignments, submissions, grading results, and uploaded files.",
+      confirmLabel: "Delete class",
+    });
+    if (!confirmed) return;
     setError("");
     try {
       await api<void>(`/classes/${id}`, { method: "DELETE" });
@@ -150,7 +158,12 @@ export default function ClassPage() {
   }
 
   async function deleteAssignment(assignmentId: string, assignmentTitle: string) {
-    if (!window.confirm(`Delete assignment "${assignmentTitle}" and its submissions?`)) return;
+    const confirmed = await confirm({
+      title: `Delete ${assignmentTitle}?`,
+      message: "This removes the assignment, all linked submissions, grading results, and uploaded files.",
+      confirmLabel: "Delete assignment",
+    });
+    if (!confirmed) return;
     setError("");
     try {
       await api<void>(`/assignments/${assignmentId}`, { method: "DELETE" });
@@ -164,7 +177,12 @@ export default function ClassPage() {
   }
 
   async function deleteStudent(studentId: string, name: string) {
-    if (!window.confirm(`Delete student "${name}"? Existing submissions will become unassigned.`)) return;
+    const confirmed = await confirm({
+      title: `Delete ${name}?`,
+      message: "Existing submissions will stay in the assignment history, but they will no longer be attached to this student.",
+      confirmLabel: "Delete student",
+    });
+    if (!confirmed) return;
     setError("");
     try {
       await api<void>(`/classes/${id}/students/${studentId}`, { method: "DELETE" });

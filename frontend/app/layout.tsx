@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { ToastProvider } from "@/components/ToastProvider";
 import "./globals.css";
 
@@ -18,7 +19,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           rel="stylesheet"
         />
       </head>
-      <body><ToastProvider>{children}</ToastProvider></body>
+      <body>
+        <ToastProvider>
+          <ConfirmProvider>{children}</ConfirmProvider>
+        </ToastProvider>
+      </body>
     </html>
   );
 }

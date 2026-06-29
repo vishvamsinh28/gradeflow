@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { Header } from "@/components/Header";
 import { useToast } from "@/components/ToastProvider";
 import { API_URL, api } from "@/lib/api";
@@ -15,6 +16,7 @@ const textareaClass = "app-textarea min-h-[100px] w-full resize-y rounded-xl bor
 export default function SubmissionPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const confirm = useConfirm();
   const { notify } = useToast();
   const [data, setData] = useState<Submission | null>(null);
   const [score, setScore] = useState("");
@@ -76,7 +78,14 @@ export default function SubmissionPage() {
   }
 
   async function deleteSubmission() {
-    if (!data || !window.confirm(`Delete submission "${data.student?.name || data.original_filename}"?`)) return;
+    if (!data) return;
+    const label = data.student?.name || data.original_filename;
+    const confirmed = await confirm({
+      title: `Delete ${label}?`,
+      message: "This removes the uploaded work and its question-level grading results.",
+      confirmLabel: "Delete submission",
+    });
+    if (!confirmed) return;
     setError("");
     try {
       await api<void>(`/submissions/${id}`, { method: "DELETE" });

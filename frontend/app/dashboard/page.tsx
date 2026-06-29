@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { Header } from "@/components/Header";
 import { useToast } from "@/components/ToastProvider";
 import { api, clearAuthToken } from "@/lib/api";
@@ -24,6 +25,7 @@ type ReviewQueueItem = {
 
 export default function Dashboard() {
   const router = useRouter();
+  const confirm = useConfirm();
   const { notify } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [classes, setClasses] = useState<Classroom[]>([]);
@@ -85,7 +87,12 @@ export default function Dashboard() {
   }
 
   async function deleteClass(classId: string, className: string) {
-    if (!window.confirm(`Delete "${className}" and all of its assignments, submissions, and students?`)) return;
+    const confirmed = await confirm({
+      title: `Delete ${className}?`,
+      message: "This removes the class, its students, assignments, submissions, grading results, and uploaded files.",
+      confirmLabel: "Delete class",
+    });
+    if (!confirmed) return;
     setError("");
     try {
       await api<void>(`/classes/${classId}`, { method: "DELETE" });

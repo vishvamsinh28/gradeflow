@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { Header } from "@/components/Header";
 import { useToast } from "@/components/ToastProvider";
 import { api } from "@/lib/api";
@@ -93,6 +94,7 @@ function buildAssignmentPayload(questions: QuestionDraft[], generalRules: string
 export default function AssignmentPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const confirm = useConfirm();
   const { notify } = useToast();
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -182,7 +184,13 @@ export default function AssignmentPage() {
   }
 
   async function deleteAssignment() {
-    if (!assignment || !window.confirm(`Delete "${assignment.title}" and all of its submissions?`)) return;
+    if (!assignment) return;
+    const confirmed = await confirm({
+      title: `Delete ${assignment.title}?`,
+      message: "This removes the assignment, submissions, grading results, and uploaded files.",
+      confirmLabel: "Delete assignment",
+    });
+    if (!confirmed) return;
     setError("");
     try {
       await api<void>(`/assignments/${id}`, { method: "DELETE" });
@@ -196,7 +204,12 @@ export default function AssignmentPage() {
   }
 
   async function deleteSubmission(submissionId: string, label: string) {
-    if (!window.confirm(`Delete submission "${label}"?`)) return;
+    const confirmed = await confirm({
+      title: `Delete ${label}?`,
+      message: "This removes the uploaded work and its question-level grading results.",
+      confirmLabel: "Delete submission",
+    });
+    if (!confirmed) return;
     setError("");
     try {
       await api<void>(`/submissions/${submissionId}`, { method: "DELETE" });
@@ -308,7 +321,13 @@ export default function AssignmentPage() {
   }
 
   async function regradeAll() {
-    if (!window.confirm("Regrade all submissions for this assignment using the current answer key and rubric?")) return;
+    const confirmed = await confirm({
+      title: "Regrade all submissions?",
+      message: "GradeFlow will queue every eligible submission using the current answer key and rubric. Existing scores may change when the new results finish.",
+      confirmLabel: "Queue regrade",
+      tone: "primary",
+    });
+    if (!confirmed) return;
     setError("");
     setRegrading(true);
     try {

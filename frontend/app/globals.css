@@ -220,6 +220,94 @@ button {
   border-color: rgba(0, 201, 167, 0.4);
 }
 
+.confirm-overlay {
+  align-items: center;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(0, 201, 167, 0.14), transparent 28rem),
+    rgba(3, 9, 17, 0.78);
+  backdrop-filter: blur(14px);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 18px;
+  position: fixed;
+  z-index: 220;
+}
+
+.confirm-dialog {
+  background:
+    linear-gradient(145deg, rgba(19, 35, 56, 0.98), rgba(11, 24, 41, 0.98));
+  border: 1px solid rgba(132, 150, 176, 0.28);
+  border-radius: 18px;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.45);
+  display: grid;
+  gap: 22px;
+  max-width: 520px;
+  padding: 24px;
+  position: relative;
+  width: min(520px, 100%);
+}
+
+.confirm-dialog::before {
+  background: linear-gradient(90deg, rgba(0, 201, 167, 0.9), rgba(245, 158, 11, 0.8), rgba(248, 113, 113, 0.85));
+  border-radius: 18px 18px 0 0;
+  content: "";
+  height: 3px;
+  inset: 0 0 auto;
+  position: absolute;
+}
+
+.confirm-mark {
+  border-radius: 999px;
+  height: 10px;
+  width: 10px;
+}
+
+.confirm-mark-danger {
+  background: var(--red);
+  box-shadow: 0 0 28px rgba(248, 113, 113, 0.72);
+}
+
+.confirm-mark-primary {
+  background: var(--teal);
+  box-shadow: 0 0 28px rgba(0, 201, 167, 0.72);
+}
+
+.confirm-eyebrow {
+  color: var(--teal);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.confirm-title {
+  color: var(--white);
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(24px, 5vw, 32px);
+  font-weight: 700;
+  line-height: 1.05;
+  margin: 8px 0 0;
+}
+
+.confirm-message {
+  color: var(--white-dim);
+  font-size: 15px;
+  line-height: 1.7;
+  margin: 12px 0 0;
+}
+
+.confirm-actions {
+  display: flex;
+  flex-wrap: wrap-reverse;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.confirm-actions .app-btn {
+  min-width: 120px;
+}
+
 .gradeflow-landing {
   --landing-surface: #101c2c;
   --landing-card: rgba(16, 28, 44, 0.84);
