@@ -15,6 +15,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     ...init,
     headers,
     credentials: "include",
+    cache: "no-store",
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({ detail: "Request failed" }));
