@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, status
 from supabase import Client
 
@@ -7,6 +9,7 @@ from app.models.schemas import ClassCreate, StudentCreate
 from app.services.storage import SubmissionStorage
 
 router = APIRouter(prefix="/classes", tags=["classes"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("")
@@ -67,8 +70,12 @@ def delete_class(class_id: str, user=Depends(get_current_user), db: Client = Dep
             .execute()
             .data
         )
-        SubmissionStorage(db).delete_many([row["storage_path"] for row in submissions])
     db.table("classes").delete().eq("id", class_id).execute()
+    if assignment_ids:
+        try:
+            SubmissionStorage(db).delete_many([row["storage_path"] for row in submissions])
+        except Exception:
+            logger.exception("Storage cleanup failed for deleted class %s", class_id)
 
 
 @router.delete("/{class_id}/students/{student_id}", status_code=status.HTTP_204_NO_CONTENT)

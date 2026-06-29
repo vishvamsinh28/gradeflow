@@ -268,31 +268,6 @@ function HeroMetric({ value, label, tone = "green" }: { value: string; label: st
   );
 }
 
-function MiniPanel({ title, value, text, tone }: { title: string; value: string; text: string; tone: "amber" | "violet" | "green" }) {
-  return (
-    <div className={`mini-panel mini-${tone}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-xs text-[#A8B7C9]">{title}</div>
-          <p className="mt-1 text-xs leading-5 text-[#DCE7F4]">{text}</p>
-        </div>
-        <div className="font-mono text-2xl">{value}</div>
-      </div>
-    </div>
-  );
-}
-
-function InsightBar({ label, width, tone }: { label: string; width: string; tone: "green" | "amber" | "blue" }) {
-  return (
-    <div className="grid grid-cols-[120px_1fr] items-center gap-3">
-      <span className="text-xs text-[#A8B7C9]">{label}</span>
-      <div className="h-2 overflow-hidden rounded-full bg-white/10">
-        <div className={`h-full rounded-full insight-${tone}`} style={{ width }} />
-      </div>
-    </div>
-  );
-}
-
 function SectionHeading({ eyebrow, title, text }: { eyebrow: string; title: string; text: string }) {
   return (
     <div>

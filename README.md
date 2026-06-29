@@ -167,10 +167,12 @@ Assignment edits also create `assignment_versions` rows so rubric changes are tr
 
 ## Production notes
 
+- Deploy the backend with Python 3.11 or newer. This repo includes `runtime.txt` pinned to the currently verified Python runtime; deployment commands should use the backend virtual environment or install from `backend/pyproject.toml`, not the host system Python.
+- Build the frontend with `NEXT_PUBLIC_API_URL` set to the deployed API base URL, for example `https://api.example.com/api/v1`. Do not ship the default localhost value from `frontend/.env.example`.
 - If the frontend and API are on different domains, set `FRONTEND_ORIGIN` to the exact production frontend origin. If you need more than one allowed frontend, set `FRONTEND_ORIGINS` to a comma-separated list such as `https://app.example.com,https://www.example.com`. Use origins only: no trailing paths. Also set `COOKIE_SECURE=true` and `COOKIE_SAMESITE=none` so browser `credentials: "include"` requests can carry the HTTP-only session cookie over HTTPS.
 - If the frontend and API are under the same site, such as `app.example.com` and `api.example.com`, `COOKIE_SAMESITE=lax` can be used with `COOKIE_SECURE=true`.
 - Keep the state-changing endpoint Origin checks enabled. Add per-request CSRF tokens if you need stronger browser-side request forgery protection.
-- Replace synchronous grading with a worker/queue for larger batches.
+- Current grading and regrading requests enqueue FastAPI background tasks to avoid request timeouts. Replace those background tasks with a durable worker/queue before running large production batches or multiple API replicas.
 - Add malware scanning and stricter file validation before processing uploads.
 - Add signed download URLs and retention/deletion policies for student work.
 - Build a LangSmith evaluation dataset from teacher-approved grading examples before allowing automatic grade release.

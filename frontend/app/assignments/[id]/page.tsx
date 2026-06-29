@@ -170,7 +170,7 @@ export default function AssignmentPage() {
     setGradingId(submissionId);
     try {
       await api(`/submissions/${submissionId}/grade`, { method: "POST" });
-      notify("Submission graded", "success");
+      notify("Grading queued", "success");
       await load();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Grading failed";
@@ -266,9 +266,18 @@ export default function AssignmentPage() {
   }
 
   async function gradeAllUngraded() {
-    const queue = submissions.filter((submission) => submission.status === "uploaded" || submission.status === "failed");
-    for (const submission of queue) {
-      await grade(submission.id);
+    setError("");
+    setRegrading(true);
+    try {
+      const result = await api<{ queued: number }>(`/assignments/${id}/grade-ungraded`, { method: "POST" });
+      notify(`Queued ${result.queued} submissions for grading`, result.queued ? "success" : "info");
+      await load();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not queue grading";
+      setError(message);
+      notify(message, "error");
+    } finally {
+      setRegrading(false);
     }
   }
 
@@ -303,8 +312,8 @@ export default function AssignmentPage() {
     setError("");
     setRegrading(true);
     try {
-      const result = await api<{ regraded: number; failed: number }>(`/assignments/${id}/regrade`, { method: "POST" });
-      notify(`Regraded ${result.regraded} submissions${result.failed ? `, ${result.failed} failed` : ""}`, result.failed ? "info" : "success");
+      const result = await api<{ queued: number }>(`/assignments/${id}/regrade`, { method: "POST" });
+      notify(`Queued ${result.queued} submissions for regrading`, result.queued ? "success" : "info");
       await load();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Could not regrade submissions";
@@ -398,7 +407,7 @@ export default function AssignmentPage() {
               <p className="mt-1 text-sm leading-6 text-[#8496B0]">Grade new uploads, review uncertain work, then return results when you are ready.</p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <button className="app-btn app-btn-secondary" disabled={!ungradedCount || Boolean(gradingId)} onClick={gradeAllUngraded} type="button">Grade {ungradedCount || "all"} ungraded</button>
+              <button className="app-btn app-btn-secondary" disabled={!ungradedCount || Boolean(gradingId) || regrading} onClick={gradeAllUngraded} type="button">{regrading ? "Queueing..." : `Grade ${ungradedCount || "all"} ungraded`}</button>
               <button className="app-btn app-btn-primary" disabled={!submissions.length || Boolean(reviewCount)} onClick={bulkApprove} type="button">Approve completed</button>
               <button className="app-btn app-btn-ghost" disabled={!submissions.length} onClick={exportCsv} type="button">Export CSV</button>
             </div>
@@ -543,7 +552,7 @@ export default function AssignmentPage() {
               </label>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <button className="app-btn app-btn-secondary app-btn-full" disabled={savingAssignment} type="submit">{savingAssignment ? "Saving..." : "Save version"}</button>
-                <button className="app-btn app-btn-primary app-btn-full" disabled={regrading || !submissions.length} onClick={regradeAll} type="button">{regrading ? "Regrading..." : "Regrade all"}</button>
+                <button className="app-btn app-btn-primary app-btn-full" disabled={regrading || !submissions.length} onClick={regradeAll} type="button">{regrading ? "Queueing..." : "Regrade all"}</button>
               </div>
             </form>
 

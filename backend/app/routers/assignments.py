@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
+import logging
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from supabase import Client
 
 from app.db.supabase import get_supabase
@@ -11,6 +12,30 @@ from app.services.storage import SubmissionStorage
 from app.workflows.grading import GradingWorkflow
 
 router = APIRouter(tags=["assignments"])
+logger = logging.getLogger(__name__)
+
+
+def run_assignment_regrade_job(assignment_id: str, owner_id: str, submission_ids: list[str]) -> None:
+    db = get_supabase()
+    workflow = GradingWorkflow(db)
+    regraded = 0
+    failed = 0
+    for submission_id in submission_ids:
+        try:
+            workflow.run(submission_id)
+            regraded += 1
+        except Exception:
+            failed += 1
+            logger.exception("Regrading failed for submission %s", submission_id)
+    log_audit(
+        db,
+        owner_id=owner_id,
+        actor_id=owner_id,
+        entity_type="assignment",
+        entity_id=assignment_id,
+        action="assignment.regraded",
+        details={"regraded": regraded, "failed": failed, "queued": len(submission_ids)},
+    )
 
 
 @router.post("/classes/{class_id}/assignments", status_code=status.HTTP_201_CREATED)
@@ -175,7 +200,7 @@ def bulk_approve_assignment(
         .update({"status": "completed", "review_required": False, "reviewed_at": now, "updated_at": now})
         .eq("assignment_id", assignment_id)
         .eq("review_required", False)
-        .in_("status", ["completed", "review_required"])
+        .eq("status", "completed")
         .execute()
     )
     log_audit(
@@ -224,6 +249,7 @@ def return_assignment_results(
 @router.post("/assignments/{assignment_id}/regrade")
 def regrade_assignment(
     assignment_id: str,
+    background_tasks: BackgroundTasks,
     user=Depends(get_current_user),
     db: Client = Depends(get_supabase),
 ):
@@ -236,25 +262,58 @@ def regrade_assignment(
         .execute()
         .data
     )
-    workflow = GradingWorkflow(db)
-    regraded = 0
-    failed = 0
-    for submission in submissions:
-        try:
-            workflow.run(submission["id"])
-            regraded += 1
-        except Exception:
-            failed += 1
+    submission_ids = [submission["id"] for submission in submissions]
+    now = datetime.now(timezone.utc).isoformat()
+    if submission_ids:
+        db.table("submissions").update(
+            {"status": "processing", "error_message": None, "updated_at": now}
+        ).in_("id", submission_ids).execute()
+        background_tasks.add_task(run_assignment_regrade_job, assignment_id, user["id"], submission_ids)
     log_audit(
         db,
         owner_id=user["id"],
         actor_id=user["id"],
         entity_type="assignment",
         entity_id=assignment_id,
-        action="assignment.regraded",
-        details={"regraded": regraded, "failed": failed},
+        action="assignment.regrade_queued",
+        details={"queued": len(submission_ids)},
     )
-    return {"regraded": regraded, "failed": failed}
+    return {"queued": len(submission_ids)}
+
+
+@router.post("/assignments/{assignment_id}/grade-ungraded")
+def grade_ungraded_assignment(
+    assignment_id: str,
+    background_tasks: BackgroundTasks,
+    user=Depends(get_current_user),
+    db: Client = Depends(get_supabase),
+):
+    owned_assignment(db, assignment_id, user["id"])
+    submissions = (
+        db.table("submissions")
+        .select("id,status")
+        .eq("assignment_id", assignment_id)
+        .in_("status", ["uploaded", "failed"])
+        .execute()
+        .data
+    )
+    submission_ids = [submission["id"] for submission in submissions]
+    now = datetime.now(timezone.utc).isoformat()
+    if submission_ids:
+        db.table("submissions").update(
+            {"status": "processing", "error_message": None, "updated_at": now}
+        ).in_("id", submission_ids).execute()
+        background_tasks.add_task(run_assignment_regrade_job, assignment_id, user["id"], submission_ids)
+    log_audit(
+        db,
+        owner_id=user["id"],
+        actor_id=user["id"],
+        entity_type="assignment",
+        entity_id=assignment_id,
+        action="assignment.grade_ungraded_queued",
+        details={"queued": len(submission_ids)},
+    )
+    return {"queued": len(submission_ids)}
 
 
 @router.get("/assignments/{assignment_id}/submissions")
@@ -327,8 +386,11 @@ def delete_assignment(
 ):
     owned_assignment(db, assignment_id, user["id"])
     submissions = db.table("submissions").select("storage_path").eq("assignment_id", assignment_id).execute().data
-    SubmissionStorage(db).delete_many([row["storage_path"] for row in submissions])
     db.table("assignments").delete().eq("id", assignment_id).execute()
+    try:
+        SubmissionStorage(db).delete_many([row["storage_path"] for row in submissions])
+    except Exception:
+        logger.exception("Storage cleanup failed for deleted assignment %s", assignment_id)
     log_audit(
         db,
         owner_id=user["id"],

@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from supabase import Client
 
 from app.db.supabase import get_supabase
@@ -13,6 +13,25 @@ from app.workflows.grading import GradingWorkflow
 
 router = APIRouter(prefix="/submissions", tags=["submissions"])
 logger = logging.getLogger(__name__)
+
+
+def run_grading_job(submission_id: str, owner_id: str, assignment_id: str) -> None:
+    db = get_supabase()
+    try:
+        GradingWorkflow(db).run(submission_id)
+        submission = db.table("submissions").select("status").eq("id", submission_id).limit(1).execute()
+        status = submission.data[0]["status"] if submission.data else "unknown"
+        log_audit(
+            db,
+            owner_id=owner_id,
+            actor_id=owner_id,
+            entity_type="submission",
+            entity_id=submission_id,
+            action="submission.graded",
+            details={"assignment_id": assignment_id, "status": status},
+        )
+    except Exception:
+        logger.exception("Grading failed for submission %s", submission_id)
 
 
 @router.get("/review-queue")
@@ -86,26 +105,20 @@ def get_submission_file(
 @router.post("/{submission_id}/grade")
 def grade_submission(
     submission_id: str,
+    background_tasks: BackgroundTasks,
     user=Depends(get_current_user),
     db: Client = Depends(get_supabase),
 ):
-    owned_submission(db, submission_id, user["id"])
-    try:
-        GradingWorkflow(db).run(submission_id)
-    except Exception as exc:
-        logger.exception("Grading failed for submission %s", submission_id)
-        raise HTTPException(status_code=502, detail="Grading failed. Please retry or review the submission manually.") from exc
     submission = owned_submission(db, submission_id, user["id"])
-    log_audit(
-        db,
-        owner_id=user["id"],
-        actor_id=user["id"],
-        entity_type="submission",
-        entity_id=submission_id,
-        action="submission.graded",
-        details={"assignment_id": submission["assignment_id"], "status": submission["status"]},
-    )
-    return {"id": submission_id, "status": submission["status"]}
+    db.table("submissions").update(
+        {
+            "status": "processing",
+            "error_message": None,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    ).eq("id", submission_id).execute()
+    background_tasks.add_task(run_grading_job, submission_id, user["id"], submission["assignment_id"])
+    return {"id": submission_id, "status": "processing"}
 
 
 @router.post("/{submission_id}/approve")
@@ -179,9 +192,12 @@ def delete_submission(
     db: Client = Depends(get_supabase),
 ):
     submission = owned_submission(db, submission_id, user["id"])
-    SubmissionStorage(db).delete_many([submission["storage_path"]])
     db.table("grading_results").delete().eq("submission_id", submission_id).execute()
     db.table("submissions").delete().eq("id", submission_id).execute()
+    try:
+        SubmissionStorage(db).delete_many([submission["storage_path"]])
+    except Exception:
+        logger.exception("Storage cleanup failed for deleted submission %s", submission_id)
     log_audit(
         db,
         owner_id=user["id"],

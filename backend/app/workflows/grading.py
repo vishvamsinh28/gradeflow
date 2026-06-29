@@ -159,7 +159,13 @@ class GradingWorkflow:
         grading = GradingResult.model_validate(state["grading"])
         submission_id = state["submission_id"]
 
-        self.db.table("grading_results").delete().eq("submission_id", submission_id).execute()
+        existing_results = (
+            self.db.table("grading_results")
+            .select("question_number,student_work,score,max_score,is_correct,feedback,confidence,error_category")
+            .eq("submission_id", submission_id)
+            .execute()
+            .data
+        )
         rows = [
             {
                 "submission_id": submission_id,
@@ -167,27 +173,46 @@ class GradingWorkflow:
             }
             for question in grading.questions
         ]
-        if rows:
-            self.db.table("grading_results").insert(rows).execute()
+        try:
+            self.db.table("grading_results").delete().eq("submission_id", submission_id).execute()
+            if rows:
+                self.db.table("grading_results").insert(rows).execute()
 
-        self.db.table("submissions").update(
-            {
-                "status": state["status"],
-                "extracted_answers": state["extracted"],
-                "score": grading.score,
-                "max_score": grading.max_score,
-                "feedback": state["final_feedback"],
-                "confidence": state["confidence"],
-                "review_required": state["review_required"],
-                "error_message": None,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }
-        ).eq("id", submission_id).execute()
+            self.db.table("submissions").update(
+                {
+                    "status": state["status"],
+                    "extracted_answers": state["extracted"],
+                    "score": grading.score,
+                    "max_score": grading.max_score,
+                    "feedback": state["final_feedback"],
+                    "confidence": state["confidence"],
+                    "review_required": state["review_required"],
+                    "error_message": None,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            ).eq("id", submission_id).execute()
+        except Exception:
+            if existing_results:
+                self.db.table("grading_results").delete().eq("submission_id", submission_id).execute()
+                self.db.table("grading_results").insert(
+                    [
+                        {
+                            "submission_id": submission_id,
+                            **result,
+                        }
+                        for result in existing_results
+                    ]
+                ).execute()
+            raise
         return {"status": state["status"]}
 
     def run(self, submission_id: str) -> GradingState:
         self.db.table("submissions").update(
-            {"status": "processing", "error_message": None, "updated_at": "now()"}
+            {
+                "status": "processing",
+                "error_message": None,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
         ).eq("id", submission_id).execute()
         try:
             return self.graph.invoke({"submission_id": submission_id})
