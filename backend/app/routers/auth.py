@@ -37,7 +37,7 @@ def set_auth_cookie(response: Response, token: str) -> None:
         value=token,
         httponly=True,
         secure=settings.cookie_secure,
-        samesite="lax",
+        samesite=settings.cookie_samesite,
         max_age=max_age,
         expires=datetime.now(timezone.utc) + timedelta(seconds=max_age),
         path="/",
@@ -85,7 +85,13 @@ def login(payload: LoginRequest, response: Response, db: Client = Depends(get_su
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(response: Response):
-    response.delete_cookie("access_token", path="/")
+    settings = get_settings()
+    response.delete_cookie(
+        "access_token",
+        path="/",
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
+    )
 
 
 @router.get("/me", response_model=UserResponse)

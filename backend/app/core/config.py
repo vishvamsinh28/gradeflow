@@ -1,5 +1,7 @@
 from functools import lru_cache
 
+from typing import Literal
+
 from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -23,6 +25,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7
     cookie_secure: bool = False
+    cookie_samesite: Literal["lax", "strict", "none"] = "lax"
 
     gemini_api_key: str
     gemini_model: str = "gemini-3.1-flash-lite"
@@ -43,6 +46,8 @@ class Settings(BaseSettings):
     def require_langsmith_tracing(self) -> "Settings":
         if not self.langsmith_tracing:
             raise ValueError("LANGSMITH_TRACING must be true because LangSmith tracing is required")
+        if self.cookie_samesite == "none" and not self.cookie_secure:
+            raise ValueError("COOKIE_SECURE must be true when COOKIE_SAMESITE=none")
         return self
 
 
