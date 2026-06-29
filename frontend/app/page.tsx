@@ -56,29 +56,32 @@ export default function Home() {
             <li><a className="text-sm text-[#A8B7C9] transition hover:text-white" href="#proof">Product</a></li>
             <li><button className="text-sm text-[#A8B7C9] transition hover:text-white" onClick={() => openAuth("login")}>Sign in</button></li>
           </ul>
-          <button onClick={() => openAuth("register")} className="app-btn app-btn-primary">
+          <button onClick={() => openAuth("register")} className="app-btn app-btn-primary landing-nav-cta">
             Start grading
           </button>
         </div>
       </nav>
 
-      <section id="top" className="relative isolate flex min-h-[92svh] items-center overflow-hidden px-[4vw] pb-16 pt-28">
+      <section id="top" className="relative isolate flex min-h-svh items-center overflow-hidden px-[4vw] pb-10 pt-24 sm:pb-12 lg:pt-24">
         <ProductBackdrop />
-        <div className="relative z-10 mx-auto grid w-[min(1200px,92vw)] items-end gap-10 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="relative z-10 mx-auto grid w-[min(1200px,92vw)] items-center gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:gap-10">
           <div className="landing-reveal pb-6">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#00c9a740] bg-[#00c9a710] px-3.5 py-1 text-[13px] font-semibold text-[#72F1DA]">
+            <div className="landing-hero-pill mb-5">
               <span className="h-1.5 w-1.5 rounded-full bg-[#72F1DA] shadow-[0_0_18px_rgba(114,241,218,.9)]" />
-              AI grading, review, and result release in one workspace
+              <span className="sm:hidden">AI grading workspace</span>
+              <span className="hidden sm:inline">AI grading, review, and result release in one workspace</span>
             </div>
-            <h1 className="font-display text-[clamp(58px,9vw,120px)] font-bold leading-[0.88] tracking-[-4px] text-white">
-              GradeFlow
+            <h1 className="landing-hero-title font-display">
+              <span>Grade</span><span className="landing-title-accent">Flow</span>
+              <span className="landing-title-line">AI grading workspace</span>
             </h1>
-            <p className="mt-7 max-w-[620px] text-[clamp(18px,2vw,22px)] leading-[1.55] text-[#C5D1DF]">
-              Turn worksheet piles into scored submissions, review queues, class insights, returned student results, and an auditable grading history.
+            <p className="landing-hero-copy mt-6">
+              Turn worksheet piles into <strong>scored submissions</strong>, review queues, class insights, returned student results, and an auditable grading history.
             </p>
-            <div className="mt-9 flex flex-wrap gap-3.5">
-              <button className={primaryButton} onClick={() => openAuth("register")}>Create workspace</button>
+            <div className="landing-hero-actions mt-8">
+              <button className={`${primaryButton} landing-primary-action`} onClick={() => openAuth("register")}>Create workspace</button>
               <a className={ghostButton} href="#workflow">See workflow</a>
+              <span className="landing-action-note">Create a class, add a rubric, and review AI-scored work.</span>
             </div>
             <div className="mt-9 grid max-w-[620px] grid-cols-3 gap-3">
               <HeroMetric value="47s" label="demo batch" />
@@ -206,50 +209,51 @@ function ProductBackdrop() {
 
 function ProductWorkspace() {
   return (
-    <div className="landing-panel landing-float p-4 sm:p-5">
-      <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-4">
+    <div className="landing-flow-console landing-float">
+      <div className="landing-console-header">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[#72F1DA]">Assignment workspace</div>
-          <div className="font-display text-xl font-semibold">Period 3 · Fractions Unit</div>
+          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[#72F1DA]">Live grading run</div>
+          <div className="font-display text-xl font-semibold">Fractions Unit · Period 3</div>
         </div>
-        <div className="flex gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-[#4ADE80]" />
-          <span className="h-2.5 w-2.5 rounded-full bg-[#F59E0B]" />
-          <span className="h-2.5 w-2.5 rounded-full bg-[#F87171]" />
-        </div>
+        <span className="landing-run-status">47s</span>
       </div>
-      <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="space-y-3">
-          {gradeRows.map((row, index) => (
-            <div className="landing-row" style={{ animationDelay: `${index * 120}ms` }} key={row.name}>
-              <div className={`grade-line ${row.tone}`} />
-              <div className="min-w-0">
-                <div className="truncate font-display text-sm font-semibold">{row.name}</div>
-                <div className="mt-1 text-xs text-[#A8B7C9]">{row.note}</div>
-              </div>
-              <div className={`grade-chip ${row.tone}`}>
-                <span>{row.grade}</span>
-                <strong>{row.score}</strong>
-              </div>
+
+      <div className="landing-flow-grid">
+        <div className="landing-pipeline">
+          {[
+            ["01", "Upload", "28 pages"],
+            ["02", "Extract", "answers mapped"],
+            ["03", "Grade", "rubric applied"],
+            ["04", "Review", "3 flags"],
+            ["05", "Return", "student links"],
+          ].map(([step, title, text]) => (
+            <div className="landing-flow-node" key={step}>
+              <span>{step}</span>
+              <strong>{title}</strong>
+              <small>{text}</small>
             </div>
           ))}
         </div>
-        <div className="space-y-3">
-          <MiniPanel title="Review queue" value="3" text="Flagged for teacher judgment" tone="amber" />
-          <MiniPanel title="Rubric version" value="v4" text="Updated partial-credit rule" tone="violet" />
-          <MiniPanel title="Returned links" value="28" text="Student portals ready" tone="green" />
+
+        <div className="landing-grade-board">
+          {gradeRows.slice(0, 3).map((row) => (
+            <div className="landing-score-row" key={row.name}>
+              <div>
+                <strong>{row.name}</strong>
+                <span>{row.note}</span>
+              </div>
+              <b className={row.tone}>{row.score}</b>
+            </div>
+          ))}
         </div>
       </div>
-      <div className="mt-4 rounded-xl border border-white/10 bg-[#101C2C] p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#A8B7C9]">Question insights</span>
-          <span className="text-xs text-[#F59E0B]">common error detected</span>
+
+      <div className="landing-console-footer">
+        <div>
+          <span>Review queue</span>
+          <strong>3 submissions need teacher judgment</strong>
         </div>
-        <div className="space-y-2">
-          <InsightBar label="LCD setup" width="86%" tone="green" />
-          <InsightBar label="Numerator addition" width="44%" tone="amber" />
-          <InsightBar label="Simplification" width="72%" tone="blue" />
-        </div>
+        <button type="button">Open queue</button>
       </div>
     </div>
   );
