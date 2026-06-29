@@ -66,7 +66,7 @@ def register(payload: RegisterRequest, response: Response, db: Client = Depends(
     user = user_response.data[0]
     token = create_access_token(user["id"], {"email": user["email"]})
     set_auth_cookie(response, token)
-    return {"user": user}
+    return {"user": user, "access_token": token}
 
 
 @router.post("/login", response_model=AuthResponse)
@@ -80,7 +80,7 @@ def login(payload: LoginRequest, response: Response, db: Client = Depends(get_su
     user = result.data[0]
     token = create_access_token(user["id"], {"email": user["email"]})
     set_auth_cookie(response, token)
-    return {"user": user}
+    return {"user": user, "access_token": token}
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

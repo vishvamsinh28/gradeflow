@@ -2,13 +2,17 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, clearAuthToken } from "@/lib/api";
 
 export function Header() {
   const router = useRouter();
 
   async function logout() {
-    await api<void>("/auth/logout", { method: "POST" });
+    try {
+      await api<void>("/auth/logout", { method: "POST" });
+    } finally {
+      clearAuthToken();
+    }
     router.push("/");
   }
 

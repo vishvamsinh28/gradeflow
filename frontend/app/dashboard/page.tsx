@@ -5,7 +5,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
 import { useToast } from "@/components/ToastProvider";
-import { api } from "@/lib/api";
+import { api, clearAuthToken } from "@/lib/api";
 import { Classroom, TeacherSettings, User } from "@/lib/types";
 
 const inputClass = "app-input w-full rounded-xl border border-[#8496b02e] bg-[#0B1829] px-4 py-3 text-sm text-[#F8FAFC]";
@@ -50,6 +50,7 @@ export default function Dashboard() {
       setGrade((current) => current || settingsRow.default_grade_level || "");
     } catch (err) {
       if (err instanceof Error && "status" in err && err.status === 401) {
+        clearAuthToken();
         router.replace("/");
         return;
       }

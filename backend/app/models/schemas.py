@@ -29,6 +29,7 @@ class UserResponse(APIModel):
 
 class AuthResponse(APIModel):
     user: UserResponse
+    access_token: str
 
 
 class ClassCreate(APIModel):
