@@ -1,3 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --color-navy: #0b1829;
+  --color-navy-mid: #132338;
+  --color-navy-light: #1e344f;
+  --color-teal: #00c9a7;
+  --color-teal-dim: #00a88c;
+  --color-amber: #f59e0b;
+  --color-slate: #8496b0;
+  --color-cloud: #f8fafc;
+  --color-cloud-dim: #e2eaf4;
+}
+
 :root {
   --navy: #0b1829;
   --navy-mid: #132338;
