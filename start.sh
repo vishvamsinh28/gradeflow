@@ -4,7 +4,7 @@ set -Eeuo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$ROOT_DIR/backend"
 FRONTEND_DIR="$ROOT_DIR/frontend"
-VENV_UVICORN="$BACKEND_DIR/.venv/bin/uvicorn"
+VENV_PYTHON="$BACKEND_DIR/.venv/bin/python"
 NEXT_BIN="$FRONTEND_DIR/node_modules/.bin/next"
 BACKEND_PID=""
 FRONTEND_PID=""
@@ -51,14 +51,14 @@ cleanup() {
   [ -n "$FRONTEND_PID" ] && wait "$FRONTEND_PID" 2>/dev/null || true
 }
 
-[ -x "$VENV_UVICORN" ] || fail "Backend dependencies are missing. Run ./setup.sh first."
+[ -x "$VENV_PYTHON" ] || fail "Backend dependencies are missing. Run ./setup.sh first."
 [ -x "$NEXT_BIN" ] || fail "Frontend dependencies are missing. Run ./setup.sh first."
 [ -f "$BACKEND_DIR/.env" ] || fail "backend/.env is missing. Run ./setup.sh first."
 [ -f "$FRONTEND_DIR/.env.local" ] || [ -f "$FRONTEND_DIR/.env" ] || fail "frontend/.env.local or frontend/.env is missing. Run ./setup.sh first."
 
 (
   cd "$BACKEND_DIR"
-  "$BACKEND_DIR/.venv/bin/python" - <<'PY'
+  "$VENV_PYTHON" - <<'PY'
 from app.core.config import get_settings
 
 get_settings()
@@ -71,7 +71,7 @@ trap cleanup EXIT
 printf '\033[1;34mStarting FastAPI at http://localhost:8000\033[0m\n'
 (
   cd "$BACKEND_DIR"
-  exec "$VENV_UVICORN" app.main:app --reload --host 127.0.0.1 --port 8000
+  exec "$VENV_PYTHON" -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ) &
 BACKEND_PID=$!
 

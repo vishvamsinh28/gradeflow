@@ -9,7 +9,7 @@ start:
 	./start.sh
 
 backend:
-	cd backend && .venv/bin/uvicorn app.main:app --reload --port 8000
+	cd backend && .venv/bin/python -m uvicorn app.main:app --reload --port 8000
 
 frontend:
 	cd frontend && npm run dev
@@ -21,10 +21,10 @@ db-setup:
 	cd backend && ./apply-db-schema.sh
 
 test:
-	cd backend && .venv/bin/pytest
+	cd backend && .venv/bin/python -m pytest
 
 lint:
-	cd backend && .venv/bin/ruff check .
+	cd backend && .venv/bin/python -m ruff check .
 
 build:
 	cd frontend && npm run build
