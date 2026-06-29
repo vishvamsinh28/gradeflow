@@ -7,7 +7,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { Header } from "@/components/Header";
 import { InlineLoading, PageLoading } from "@/components/LoadingState";
 import { useToast } from "@/components/ToastProvider";
-import { API_URL, api } from "@/lib/api";
+import { API_URL, api, getAuthToken } from "@/lib/api";
 import { Submission } from "@/lib/types";
 
 const panelClass = "rounded-2xl border border-[#8496b01f] bg-[#132338] p-5 shadow-[0_18px_48px_rgba(0,0,0,.12)] sm:p-6";
@@ -108,7 +108,6 @@ export default function SubmissionPage() {
   }
 
   const confidence = data?.confidence != null ? Math.round(data.confidence * 100) : null;
-  const fileUrl = `${API_URL}/submissions/${id}/file`;
   const extractedQuestions = data?.extracted_answers?.questions ?? [];
 
   return (
@@ -148,15 +147,7 @@ export default function SubmissionPage() {
               <div><h2 className="font-display text-2xl font-semibold">Original work</h2><p className="mt-1 text-sm text-[#8496B0]">Uploaded worksheet used for extraction and grading.</p></div>
               {data?.mime_type && <span className="rounded-full border border-[#8496b033] bg-[#8496b014] px-2.5 py-1 font-mono text-[11px] text-[#8496B0]">{data.mime_type}</span>}
             </div>
-            <div className="overflow-hidden rounded-xl border border-[#8496b01f] bg-[#0B1829]">
-              {data?.mime_type?.startsWith("image/") ? (
-                <img className="max-h-[720px] w-full object-contain" src={fileUrl} alt={data.original_filename} />
-              ) : data?.mime_type === "application/pdf" ? (
-                <iframe className="h-[720px] w-full" src={fileUrl} title={data.original_filename} />
-              ) : (
-                <div className="p-8 text-center text-sm text-[#8496B0]">Original file preview is available after the submission loads.</div>
-              )}
-            </div>
+            {data ? <SubmissionFilePreview submissionId={id} filename={data.original_filename} mimeType={data.mime_type} /> : null}
             <div className="mt-5 rounded-xl border border-[#8496b01f] bg-[#0B1829] p-4">
               <div className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Extraction notes</div>
               <p className="text-sm leading-6 text-[#E2EAF4]">{data?.extracted_answers?.document_notes || "No extraction notes were recorded."}</p>
@@ -242,6 +233,86 @@ export default function SubmissionPage() {
 function ConfidenceBadge({ value }: { value: number }) {
   const low = value < 70;
   return <span className={`w-fit rounded-full border px-2.5 py-1 font-mono text-[11px] ${low ? "border-[#f59e0b4d] bg-[#f59e0b14] text-[#F59E0B]" : "border-[#00c9a74d] bg-[#00c9a714] text-[#00C9A7]"}`}>{value}% confidence</span>;
+}
+
+function SubmissionFilePreview({ submissionId, filename, mimeType }: { submissionId: string; filename: string; mimeType?: string }) {
+  const [fileUrl, setFileUrl] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl = "";
+
+    async function loadFile() {
+      setLoading(true);
+      setError("");
+      try {
+        const token = getAuthToken();
+        const response = await fetch(`${API_URL}/submissions/${submissionId}/file`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("Could not load original file");
+        const blob = await response.blob();
+        objectUrl = URL.createObjectURL(blob);
+        if (!cancelled) setFileUrl(objectUrl);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load original file");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadFile();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [submissionId]);
+
+  const isImage = mimeType?.startsWith("image/");
+  const isPdf = mimeType === "application/pdf";
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-[#8496b01f] bg-[#0B1829]">
+      <div className="flex flex-col justify-between gap-3 border-b border-[#8496b01a] bg-[#071321] px-4 py-3 sm:flex-row sm:items-center">
+        <div className="min-w-0">
+          <div className="truncate font-display text-sm font-semibold text-[#F8FAFC]">{filename}</div>
+          <div className="mt-1 text-xs text-[#8496B0]">{mimeType || "Uploaded file"}</div>
+        </div>
+        {fileUrl && (
+          <div className="flex flex-wrap gap-2">
+            <a className="app-btn app-btn-secondary app-btn-sm" href={fileUrl} rel="noreferrer" target="_blank">Open</a>
+            <a className="app-btn app-btn-ghost app-btn-sm" download={filename} href={fileUrl}>Download</a>
+          </div>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="p-5">
+          <InlineLoading rows={3} />
+        </div>
+      ) : error ? (
+        <div className="p-8 text-center">
+          <h3 className="font-display text-lg font-semibold">Could not show the original work</h3>
+          <p className="mt-2 text-sm leading-6 text-[#8496B0]">{error}. Try refreshing after signing in again.</p>
+        </div>
+      ) : isImage && fileUrl ? (
+        <div className="bg-[#06101c] p-3">
+          <img className="mx-auto max-h-[760px] w-full rounded-lg object-contain" src={fileUrl} alt={filename} />
+        </div>
+      ) : isPdf && fileUrl ? (
+        <iframe className="h-[760px] w-full bg-[#06101c]" src={fileUrl} title={filename} />
+      ) : (
+        <div className="p-8 text-center">
+          <h3 className="font-display text-lg font-semibold">Preview unavailable</h3>
+          <p className="mt-2 text-sm leading-6 text-[#8496B0]">This file type can still be opened or downloaded from the actions above.</p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function StatusBadge({ status }: { status: string }) {
