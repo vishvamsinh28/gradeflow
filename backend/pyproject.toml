@@ -6,9 +6,9 @@ build-backend = "hatchling.build"
 name = "gradeflow-api"
 version = "0.1.0"
 description = "FastAPI, Supabase, Gemini, LangGraph and LangSmith grading MVP"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 dependencies = [
-  "fastapi>=0.115,<1",
+  "fastapi[standard]>=0.115,<1",
   "uvicorn[standard]>=0.34,<1",
   "pydantic>=2.10,<3",
   "pydantic-settings>=2.7,<3",
