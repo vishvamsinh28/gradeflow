@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { Header } from "@/components/Header";
+import { InlineLoading, PageLoading } from "@/components/LoadingState";
 import { useToast } from "@/components/ToastProvider";
 import { api } from "@/lib/api";
 import { Classroom, TeacherSettings } from "@/lib/types";
@@ -43,9 +44,14 @@ export default function ClassPage() {
   const [generalRules, setGeneralRules] = useState("");
   const [questions, setQuestions] = useState<QuestionDraft[]>([newQuestion()]);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [addingStudent, setAddingStudent] = useState(false);
+  const [creatingAssignment, setCreatingAssignment] = useState(false);
+  const [actionId, setActionId] = useState<string | null>(null);
 
   async function load() {
     try {
+      if (!data) setLoading(true);
       const [classroom, settings] = await Promise.all([
         api<Classroom>(`/classes/${id}`),
         api<TeacherSettings>("/settings"),
@@ -56,6 +62,8 @@ export default function ClassPage() {
       const message = err instanceof Error ? err.message : "Could not load class";
       setError(message);
       notify(message, "error");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -66,6 +74,7 @@ export default function ClassPage() {
   async function addStudent(event: FormEvent) {
     event.preventDefault();
     setError("");
+    setAddingStudent(true);
     try {
       await api(`/classes/${id}/students`, { method: "POST", body: JSON.stringify({ name: studentName }) });
       setStudentName("");
@@ -75,12 +84,15 @@ export default function ClassPage() {
       const message = err instanceof Error ? err.message : "Could not add student";
       setError(message);
       notify(message, "error");
+    } finally {
+      setAddingStudent(false);
     }
   }
 
   async function addAssignment(event: FormEvent) {
     event.preventDefault();
     setError("");
+    setCreatingAssignment(true);
     try {
       const cleanedQuestions = questions.map((question, index) => ({
         ...question,
@@ -122,6 +134,8 @@ export default function ClassPage() {
       const message = err instanceof Error ? err.message : "Could not create assignment";
       setError(message);
       notify(message, "error");
+    } finally {
+      setCreatingAssignment(false);
     }
   }
 
@@ -146,6 +160,7 @@ export default function ClassPage() {
     });
     if (!confirmed) return;
     setError("");
+    setActionId("delete-class");
     try {
       await api<void>(`/classes/${id}`, { method: "DELETE" });
       notify("Class deleted", "success");
@@ -154,6 +169,8 @@ export default function ClassPage() {
       const message = err instanceof Error ? err.message : "Could not delete class";
       setError(message);
       notify(message, "error");
+    } finally {
+      setActionId(null);
     }
   }
 
@@ -165,6 +182,7 @@ export default function ClassPage() {
     });
     if (!confirmed) return;
     setError("");
+    setActionId(`delete-assignment-${assignmentId}`);
     try {
       await api<void>(`/assignments/${assignmentId}`, { method: "DELETE" });
       notify("Assignment deleted", "success");
@@ -173,6 +191,8 @@ export default function ClassPage() {
       const message = err instanceof Error ? err.message : "Could not delete assignment";
       setError(message);
       notify(message, "error");
+    } finally {
+      setActionId(null);
     }
   }
 
@@ -184,6 +204,7 @@ export default function ClassPage() {
     });
     if (!confirmed) return;
     setError("");
+    setActionId(`delete-student-${studentId}`);
     try {
       await api<void>(`/classes/${id}/students/${studentId}`, { method: "DELETE" });
       notify("Student deleted", "success");
@@ -192,14 +213,24 @@ export default function ClassPage() {
       const message = err instanceof Error ? err.message : "Could not delete student";
       setError(message);
       notify(message, "error");
+    } finally {
+      setActionId(null);
     }
   }
 
   async function copyResultsLink(token?: string) {
     if (!token) return;
+    setActionId(`copy-${token}`);
     const url = `${window.location.origin}/results/${token}`;
-    await navigator.clipboard.writeText(url);
-    notify("Student results link copied", "success");
+    try {
+      await navigator.clipboard.writeText(url);
+      notify("Student results link copied", "success");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not copy link";
+      notify(message, "error");
+    } finally {
+      setActionId(null);
+    }
   }
 
   return (
@@ -219,10 +250,11 @@ export default function ClassPage() {
             {data && (
               <button
                 className="app-btn app-btn-danger app-btn-lg"
+                disabled={actionId === "delete-class"}
                 onClick={deleteClass}
                 type="button"
               >
-                Delete class
+                {actionId === "delete-class" ? "Deleting..." : "Delete class"}
               </button>
             )}
           </div>
@@ -230,8 +262,10 @@ export default function ClassPage() {
 
         {error && <div className="mt-6 rounded-xl border border-[#f8717159] bg-[#f8717112] px-4 py-3 text-sm text-[#FCA5A5]">{error}</div>}
 
-        <div className="mt-6 grid items-start gap-6 lg:grid-cols-[1fr_340px]">
-          <section className="space-y-6">
+        {loading && !data ? (
+          <PageLoading title="Loading class" detail="Fetching assignments, roster, and grading defaults." />
+        ) : (
+        <div className="mt-6 space-y-6">
             <div className={panelClass}>
               <div className="mb-5 flex items-center justify-between gap-4">
                 <div>
@@ -254,15 +288,16 @@ export default function ClassPage() {
                       <span className="rounded-full bg-[#00c9a714] px-2.5 py-1 text-[11px] font-semibold capitalize text-[#00C9A7]">{assignment.status}</span>
                       <button
                         className="app-btn app-btn-danger app-btn-sm"
+                        disabled={actionId === `delete-assignment-${assignment.id}`}
                         onClick={() => deleteAssignment(assignment.id, assignment.title)}
                         type="button"
                       >
-                        Delete
+                        {actionId === `delete-assignment-${assignment.id}` ? "Deleting..." : "Delete"}
                       </button>
                     </div>
                   </div>
                 ))}
-                {!data?.assignments?.length && <EmptyState icon="📝" title="No assignments yet" text="Use the form below to create your first answer key and rubric." />}
+                {loading ? <InlineLoading rows={2} /> : !data?.assignments?.length && <EmptyState icon="📝" title="No assignments yet" text="Use the form below to create your first answer key and rubric." />}
               </div>
             </div>
 
@@ -331,19 +366,17 @@ export default function ClassPage() {
               </div>
               <div className="mt-5 flex flex-wrap gap-3">
                 <button className="app-btn app-btn-secondary app-btn-lg" onClick={addQuestion} type="button">Add question</button>
-                <button className="app-btn app-btn-primary app-btn-lg">Create draft assignment</button>
+                <button className="app-btn app-btn-primary app-btn-lg" disabled={creatingAssignment}>{creatingAssignment ? "Creating..." : "Create draft assignment"}</button>
               </div>
             </form>
-          </section>
-
-          <aside className="space-y-6">
+          <section className="grid items-start gap-6 lg:grid-cols-[minmax(320px,0.72fr)_minmax(0,1fr)]">
             <form className={panelClass} onSubmit={addStudent}>
               <div className="mb-5 flex items-center gap-3">
                 <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#00c9a714]">＋</div>
                 <div><h2 className="font-display text-xl font-semibold">Add student</h2><p className="text-xs text-[#8496B0]">Build the class roster.</p></div>
               </div>
               <input className={inputClass} required value={studentName} onChange={(event) => setStudentName(event.target.value)} placeholder="Student name" />
-              <button className="app-btn app-btn-secondary app-btn-full app-btn-lg mt-4">Add student</button>
+              <button className="app-btn app-btn-secondary app-btn-full app-btn-lg mt-4" disabled={addingStudent}>{addingStudent ? "Adding..." : "Add student"}</button>
             </form>
 
             <div className={panelClass}>
@@ -355,25 +388,28 @@ export default function ClassPage() {
                     <Link className="flex-1 text-sm text-[#E2EAF4] transition hover:text-[#00C9A7]" href={`/classes/${id}/students/${student.id}`}>{student.name}</Link>
                     <button
                       className="app-btn app-btn-ghost app-btn-sm"
+                      disabled={actionId === `copy-${student.portal_token}`}
                       onClick={() => copyResultsLink(student.portal_token)}
                       type="button"
                     >
-                      Link
+                      {actionId === `copy-${student.portal_token}` ? "Copying..." : "Link"}
                     </button>
                     <button
                       className="app-btn app-btn-danger app-btn-sm"
+                      disabled={actionId === `delete-student-${student.id}`}
                       onClick={() => deleteStudent(student.id, student.name)}
                       type="button"
                     >
-                      Delete
+                      {actionId === `delete-student-${student.id}` ? "Deleting..." : "Delete"}
                     </button>
                   </div>
                 ))}
-                {!data?.students?.length && <p className="text-sm text-[#8496B0]">No students yet.</p>}
+                {loading ? <InlineLoading rows={3} /> : !data?.students?.length && <p className="text-sm text-[#8496B0]">No students yet.</p>}
               </div>
             </div>
-          </aside>
+          </section>
         </div>
+        )}
       </main>
     </div>
   );

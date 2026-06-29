@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { Header } from "@/components/Header";
+import { InlineLoading } from "@/components/LoadingState";
 import { useToast } from "@/components/ToastProvider";
 import { api, clearAuthToken } from "@/lib/api";
 import { Classroom, TeacherSettings, User } from "@/lib/types";
@@ -35,9 +36,13 @@ export default function Dashboard() {
   const [subject, setSubject] = useState("");
   const [reviewQueue, setReviewQueue] = useState<ReviewQueueItem[]>([]);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [creatingClass, setCreatingClass] = useState(false);
+  const [deletingClassId, setDeletingClassId] = useState<string | null>(null);
 
   async function load() {
     try {
+      if (!user) setLoading(true);
       const [me, classRows, reviewRows, settingsRow] = await Promise.all([
         api<User>("/auth/me"),
         api<Classroom[]>("/classes"),
@@ -59,6 +64,8 @@ export default function Dashboard() {
       const message = err instanceof Error ? err.message : "Could not load dashboard";
       setError(message);
       notify(message, "error");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -69,6 +76,7 @@ export default function Dashboard() {
   async function createClass(event: FormEvent) {
     event.preventDefault();
     setError("");
+    setCreatingClass(true);
     try {
       await api("/classes", {
         method: "POST",
@@ -83,6 +91,8 @@ export default function Dashboard() {
       const message = err instanceof Error ? err.message : "Could not create class";
       setError(message);
       notify(message, "error");
+    } finally {
+      setCreatingClass(false);
     }
   }
 
@@ -94,6 +104,7 @@ export default function Dashboard() {
     });
     if (!confirmed) return;
     setError("");
+    setDeletingClassId(classId);
     try {
       await api<void>(`/classes/${classId}`, { method: "DELETE" });
       notify("Class deleted", "success");
@@ -102,6 +113,8 @@ export default function Dashboard() {
       const message = err instanceof Error ? err.message : "Could not delete class";
       setError(message);
       notify(message, "error");
+    } finally {
+      setDeletingClassId(null);
     }
   }
 
@@ -138,7 +151,9 @@ export default function Dashboard() {
               <Link className="app-btn app-btn-secondary app-btn-sm" href="/review">Open queue</Link>
             </div>
           </div>
-          {reviewQueue.length ? (
+          {loading ? (
+            <InlineLoading rows={3} />
+          ) : reviewQueue.length ? (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {reviewQueue.slice(0, 6).map((item) => (
                 <Link className="rounded-xl border border-[#8496b01f] bg-[#0B1829] p-4 transition hover:border-[#00c9a759]" href={`/submissions/${item.id}`} key={item.id}>
@@ -161,7 +176,11 @@ export default function Dashboard() {
 
         <div className="grid items-start gap-6 lg:grid-cols-[1fr_360px]">
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {classes.map((item) => (
+            {loading ? (
+              <div className="sm:col-span-2 xl:col-span-3">
+                <InlineLoading rows={3} />
+              </div>
+            ) : classes.map((item) => (
               <article
                 className="group rounded-2xl border border-[#8496b01f] bg-[#132338] p-5 transition hover:-translate-y-1 hover:border-[#00c9a759] hover:shadow-[0_18px_48px_rgba(0,0,0,.16)]"
                 key={item.id}
@@ -170,10 +189,11 @@ export default function Dashboard() {
                   <span className="rounded-full border border-[#00c9a733] bg-[#00c9a714] px-2.5 py-1 text-[11px] font-semibold text-[#00C9A7]">{item.subject}</span>
                   <button
                     className="app-btn app-btn-danger app-btn-sm"
+                    disabled={deletingClassId === item.id}
                     onClick={() => deleteClass(item.id, item.name)}
                     type="button"
                   >
-                    Delete
+                    {deletingClassId === item.id ? "Deleting..." : "Delete"}
                   </button>
                 </div>
                 <Link href={`/classes/${item.id}`}>
@@ -187,7 +207,7 @@ export default function Dashboard() {
                 </Link>
               </article>
             ))}
-            {!classes.length && (
+            {!loading && !classes.length && (
               <div className={`${panelClass} sm:col-span-2 xl:col-span-3`}>
                 <div className="grid h-12 w-12 place-items-center rounded-xl border border-[#00c9a733] bg-[#00c9a714] text-2xl">🏫</div>
                 <h2 className="mt-5 font-display text-2xl font-semibold">No classes yet</h2>
@@ -216,7 +236,7 @@ export default function Dashboard() {
               <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Grade level</span>
               <input className={inputClass} value={grade} onChange={(event) => setGrade(event.target.value)} placeholder="Grade 8" />
             </label>
-            <button className="app-btn app-btn-primary app-btn-full app-btn-lg mt-6">Create class</button>
+            <button className="app-btn app-btn-primary app-btn-full app-btn-lg mt-6" disabled={creatingClass}>{creatingClass ? "Creating..." : "Create class"}</button>
           </form>
         </div>
       </main>

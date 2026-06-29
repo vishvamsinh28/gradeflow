@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { Header } from "@/components/Header";
+import { InlineLoading, PageLoading } from "@/components/LoadingState";
 import { useToast } from "@/components/ToastProvider";
 import { API_URL, api } from "@/lib/api";
 import { Submission } from "@/lib/types";
@@ -22,10 +23,13 @@ export default function SubmissionPage() {
   const [score, setScore] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   async function load() {
     try {
+      if (!data) setLoading(true);
       const row = await api<Submission>(`/submissions/${id}`);
       setData(row);
       setScore(String(row.score ?? ""));
@@ -34,6 +38,8 @@ export default function SubmissionPage() {
       const message = err instanceof Error ? err.message : "Could not load submission";
       setError(message);
       notify(message, "error");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -87,6 +93,7 @@ export default function SubmissionPage() {
     });
     if (!confirmed) return;
     setError("");
+    setDeleting(true);
     try {
       await api<void>(`/submissions/${id}`, { method: "DELETE" });
       notify("Submission deleted", "success");
@@ -95,6 +102,8 @@ export default function SubmissionPage() {
       const message = err instanceof Error ? err.message : "Could not delete submission";
       setError(message);
       notify(message, "error");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -118,10 +127,11 @@ export default function SubmissionPage() {
             {data && (
               <button
                 className="app-btn app-btn-danger"
+                disabled={deleting}
                 onClick={deleteSubmission}
                 type="button"
               >
-                Delete submission
+                {deleting ? "Deleting..." : "Delete submission"}
               </button>
             )}
           </div>
@@ -129,7 +139,10 @@ export default function SubmissionPage() {
 
         {error && <div className="mt-6 rounded-xl border border-[#f8717159] bg-[#f8717112] px-4 py-3 text-sm text-[#FCA5A5]">{error}</div>}
 
-        <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        {loading && !data ? (
+          <PageLoading title="Loading submission" detail="Fetching the uploaded work, question results, and teacher review tools." />
+        ) : (
+        <div className="mt-6 space-y-6">
           <section className={panelClass}>
             <div className="mb-6 flex flex-col justify-between gap-3 border-b border-[#8496b01a] pb-5 sm:flex-row sm:items-center">
               <div><h2 className="font-display text-2xl font-semibold">Original work</h2><p className="mt-1 text-sm text-[#8496B0]">Uploaded worksheet used for extraction and grading.</p></div>
@@ -157,7 +170,6 @@ export default function SubmissionPage() {
             </div>
           </section>
 
-          <div className="space-y-6">
           <section className={panelClass}>
             <div className="mb-6 flex flex-col justify-between gap-3 border-b border-[#8496b01a] pb-5 sm:flex-row sm:items-center">
               <div><h2 className="font-display text-2xl font-semibold">Question results</h2><p className="mt-1 text-sm text-[#8496B0]">AI-extracted work, scoring rationale, and confidence.</p></div>
@@ -187,11 +199,11 @@ export default function SubmissionPage() {
                   </article>
                 );
               })}
-              {!data?.question_results?.length && <div className="rounded-xl border border-dashed border-[#8496b033] bg-[#0B182966] p-8 text-center"><div className="text-3xl">⚡</div><h3 className="mt-3 font-display font-semibold">No question results yet</h3><p className="mt-1 text-sm text-[#8496B0]">Run grading from the assignment page to generate detailed results.</p></div>}
+              {loading ? <InlineLoading rows={2} /> : !data?.question_results?.length && <div className="rounded-xl border border-dashed border-[#8496b033] bg-[#0B182966] p-8 text-center"><div className="text-3xl">⚡</div><h3 className="mt-3 font-display font-semibold">No question results yet</h3><p className="mt-1 text-sm text-[#8496B0]">Run grading from the assignment page to generate detailed results.</p></div>}
             </div>
           </section>
 
-          <aside className="grid gap-6 lg:grid-cols-2 xl:grid-cols-1">
+          <aside className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.72fr)]">
             <div className={panelClass}>
               <div className="mb-4 flex items-center justify-between"><h2 className="font-display text-xl font-semibold">AI summary</h2><span className="text-lg">🧠</span></div>
               <p className="text-sm leading-6 text-[#E2EAF4]">{data?.feedback?.summary || "No summary yet."}</p>
@@ -216,12 +228,12 @@ export default function SubmissionPage() {
               </label>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <button disabled={saving} className="app-btn app-btn-primary app-btn-full app-btn-lg" type="submit">{saving ? "Saving..." : "Save review"}</button>
-                <button disabled={saving} className="app-btn app-btn-secondary app-btn-full app-btn-lg" onClick={approveAsIs} type="button">Approve as-is</button>
+                <button disabled={saving} className="app-btn app-btn-secondary app-btn-full app-btn-lg" onClick={approveAsIs} type="button">{saving ? "Approving..." : "Approve as-is"}</button>
               </div>
             </form>
           </aside>
-          </div>
         </div>
+        )}
       </main>
     </div>
   );

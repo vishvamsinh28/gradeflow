@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { Header } from "@/components/Header";
+import { InlineLoading, PageLoading } from "@/components/LoadingState";
 import { useToast } from "@/components/ToastProvider";
 import { api } from "@/lib/api";
 import { Assignment, AssignmentVersion, AuditLog, Submission } from "@/lib/types";
@@ -104,6 +105,7 @@ export default function AssignmentPage() {
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [newStudentName, setNewStudentName] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
   const [gradingId, setGradingId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
   const [savingAssignment, setSavingAssignment] = useState(false);
@@ -113,9 +115,13 @@ export default function AssignmentPage() {
   const [editQuestions, setEditQuestions] = useState<QuestionDraft[]>([]);
   const [editChangeNote, setEditChangeNote] = useState("");
   const [regrading, setRegrading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState("");
+  const [actionId, setActionId] = useState<string | null>(null);
 
   async function load() {
     try {
+      if (!assignment) setLoading(true);
       const [assignmentRow, submissionRows, stats, historyRows] = await Promise.all([
         api<Assignment>(`/assignments/${id}`),
         api<Submission[]>(`/assignments/${id}/submissions`),
@@ -134,6 +140,8 @@ export default function AssignmentPage() {
       const message = err instanceof Error ? err.message : "Could not load assignment";
       setError(message);
       notify(message, "error");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -150,10 +158,13 @@ export default function AssignmentPage() {
 
   async function upload(event: FormEvent) {
     event.preventDefault();
-    if (!files.length) return;
+    if (!files.length || uploading) return;
     setError("");
+    setUploading(true);
+    setUploadProgress(files.length > 1 ? `Uploading 1 of ${files.length}...` : "Uploading...");
     try {
-      for (const file of files) {
+      for (const [index, file] of files.entries()) {
+        setUploadProgress(files.length > 1 ? `Uploading ${index + 1} of ${files.length}...` : "Uploading...");
         const body = new FormData();
         body.append("file", file);
         if (files.length === 1 && selectedStudentId && selectedStudentId !== "__new__") {
@@ -173,6 +184,9 @@ export default function AssignmentPage() {
       const message = err instanceof Error ? err.message : "Upload failed";
       setError(message);
       notify(message, "error");
+    } finally {
+      setUploading(false);
+      setUploadProgress("");
     }
   }
 
@@ -206,6 +220,7 @@ export default function AssignmentPage() {
     });
     if (!confirmed) return;
     setError("");
+    setActionId("delete-assignment");
     try {
       await api<void>(`/assignments/${id}`, { method: "DELETE" });
       notify("Assignment deleted", "success");
@@ -214,6 +229,8 @@ export default function AssignmentPage() {
       const message = err instanceof Error ? err.message : "Could not delete assignment";
       setError(message);
       notify(message, "error");
+    } finally {
+      setActionId(null);
     }
   }
 
@@ -225,6 +242,7 @@ export default function AssignmentPage() {
     });
     if (!confirmed) return;
     setError("");
+    setActionId(`delete-submission-${submissionId}`);
     try {
       await api<void>(`/submissions/${submissionId}`, { method: "DELETE" });
       notify("Submission deleted", "success");
@@ -233,11 +251,14 @@ export default function AssignmentPage() {
       const message = err instanceof Error ? err.message : "Could not delete submission";
       setError(message);
       notify(message, "error");
+    } finally {
+      setActionId(null);
     }
   }
 
   async function updateStatus(status: string) {
     setError("");
+    setActionId(`status-${status}`);
     try {
       await api(`/assignments/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
       notify("Assignment status updated", "success");
@@ -246,6 +267,8 @@ export default function AssignmentPage() {
       const message = err instanceof Error ? err.message : "Could not update assignment status";
       setError(message);
       notify(message, "error");
+    } finally {
+      setActionId(null);
     }
   }
 
@@ -281,6 +304,7 @@ export default function AssignmentPage() {
 
   async function duplicateAssignment() {
     setError("");
+    setActionId("duplicate");
     try {
       const copy = await api<Assignment>(`/assignments/${id}/duplicate`, { method: "POST" });
       notify("Assignment duplicated", "success");
@@ -289,6 +313,8 @@ export default function AssignmentPage() {
       const message = err instanceof Error ? err.message : "Could not duplicate assignment";
       setError(message);
       notify(message, "error");
+    } finally {
+      setActionId(null);
     }
   }
 
@@ -310,6 +336,7 @@ export default function AssignmentPage() {
 
   async function bulkApprove() {
     setError("");
+    setActionId("bulk-approve");
     try {
       await api(`/assignments/${id}/bulk-approve`, { method: "POST" });
       notify("Completed submissions approved", "success");
@@ -318,11 +345,14 @@ export default function AssignmentPage() {
       const message = err instanceof Error ? err.message : "Could not approve completed work";
       setError(message);
       notify(message, "error");
+    } finally {
+      setActionId(null);
     }
   }
 
   async function returnResults() {
     setError("");
+    setActionId("return-results");
     try {
       await api(`/assignments/${id}/return-results`, { method: "POST" });
       notify("Results returned to student portals", "success");
@@ -331,6 +361,8 @@ export default function AssignmentPage() {
       const message = err instanceof Error ? err.message : "Could not return results";
       setError(message);
       notify(message, "error");
+    } finally {
+      setActionId(null);
     }
   }
 
@@ -405,19 +437,20 @@ export default function AssignmentPage() {
             <span className="w-fit rounded-full border border-[#00c9a733] bg-[#00c9a714] px-3 py-1.5 text-xs font-semibold capitalize text-[#00C9A7]">{assignment?.status || "active"}</span>
             {assignment && (
               <>
-                <button className="app-btn app-btn-secondary" onClick={() => updateStatus("active")} type="button">Open grading</button>
-                <button className="app-btn app-btn-ghost" onClick={returnResults} type="button">Return results</button>
-                <button className="app-btn app-btn-ghost" onClick={duplicateAssignment} type="button">Duplicate</button>
-                <button className="app-btn app-btn-ghost" onClick={() => updateStatus("archived")} type="button">Archive</button>
+                <button className="app-btn app-btn-secondary" disabled={actionId === "status-active"} onClick={() => updateStatus("active")} type="button">{actionId === "status-active" ? "Opening..." : "Open grading"}</button>
+                <button className="app-btn app-btn-ghost" disabled={actionId === "return-results"} onClick={returnResults} type="button">{actionId === "return-results" ? "Returning..." : "Return results"}</button>
+                <button className="app-btn app-btn-ghost" disabled={actionId === "duplicate"} onClick={duplicateAssignment} type="button">{actionId === "duplicate" ? "Duplicating..." : "Duplicate"}</button>
+                <button className="app-btn app-btn-ghost" disabled={actionId === "status-archived"} onClick={() => updateStatus("archived")} type="button">{actionId === "status-archived" ? "Archiving..." : "Archive"}</button>
               </>
             )}
             {assignment && (
               <button
                 className="app-btn app-btn-danger"
+                disabled={actionId === "delete-assignment"}
                 onClick={deleteAssignment}
                 type="button"
               >
-                Delete assignment
+                {actionId === "delete-assignment" ? "Deleting..." : "Delete assignment"}
               </button>
             )}
           </div>
@@ -425,6 +458,10 @@ export default function AssignmentPage() {
 
         {error && <div className="mt-6 rounded-xl border border-[#f8717159] bg-[#f8717112] px-4 py-3 text-sm text-[#FCA5A5]">{error}</div>}
 
+        {loading && !assignment ? (
+          <PageLoading title="Loading assignment" detail="Fetching submissions, analytics, rubric versions, and roster." />
+        ) : (
+        <>
         <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard value={analytics?.submission_count ?? 0} label="Submissions" />
           <MetricCard value={analytics?.scored_count ?? 0} label="Scored" tone="teal" />
@@ -441,7 +478,7 @@ export default function AssignmentPage() {
             </div>
             <div className="flex flex-wrap gap-3">
               <button className="app-btn app-btn-secondary" disabled={!ungradedCount || Boolean(gradingId) || regrading} onClick={gradeAllUngraded} type="button">{regrading ? "Queueing..." : `Grade ${ungradedCount || "all"} ungraded`}</button>
-              <button className="app-btn app-btn-primary" disabled={!submissions.length || Boolean(reviewCount)} onClick={bulkApprove} type="button">Approve completed</button>
+              <button className="app-btn app-btn-primary" disabled={!submissions.length || Boolean(reviewCount) || actionId === "bulk-approve"} onClick={bulkApprove} type="button">{actionId === "bulk-approve" ? "Approving..." : "Approve completed"}</button>
               <button className="app-btn app-btn-ghost" disabled={!submissions.length} onClick={exportCsv} type="button">Export CSV</button>
             </div>
           </div>
@@ -460,7 +497,9 @@ export default function AssignmentPage() {
               {totalErrors} flagged {totalErrors === 1 ? "item" : "items"}
             </span>
           </div>
-          {analytics?.common_errors?.length ? (
+          {loading ? (
+            <InlineLoading rows={3} />
+          ) : analytics?.common_errors?.length ? (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {analytics.common_errors.map((item) => (
                 <ErrorInsight
@@ -523,15 +562,16 @@ export default function AssignmentPage() {
                     </button>
                     <button
                       className="app-btn app-btn-danger app-btn-sm"
+                      disabled={actionId === `delete-submission-${submission.id}`}
                       onClick={() => deleteSubmission(submission.id, submission.students?.name || submission.original_filename)}
                       type="button"
                     >
-                      Delete
+                      {actionId === `delete-submission-${submission.id}` ? "Deleting..." : "Delete"}
                     </button>
                   </div>
                 </div>
               ))}
-              {!filteredSubmissions.length && <div className="rounded-xl border border-dashed border-[#8496b033] bg-[#0B182966] p-8 text-center"><div className="text-3xl">📄</div><h3 className="mt-3 font-display font-semibold">No submissions here</h3><p className="mt-1 text-sm text-[#8496B0]">Change the filter or upload work to continue.</p></div>}
+              {loading ? <InlineLoading rows={3} /> : !filteredSubmissions.length && <div className="rounded-xl border border-dashed border-[#8496b033] bg-[#0B182966] p-8 text-center"><div className="text-3xl">📄</div><h3 className="mt-3 font-display font-semibold">No submissions here</h3><p className="mt-1 text-sm text-[#8496B0]">Change the filter or upload work to continue.</p></div>}
             </div>
           </section>
 
@@ -642,10 +682,14 @@ export default function AssignmentPage() {
                 <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Worksheet</span>
                 <input className={inputClass} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple onChange={(event) => setFiles(Array.from(event.target.files ?? []))} required />
               </label>
-              <button className="app-btn app-btn-primary app-btn-full app-btn-lg mt-5">Upload {files.length > 1 ? `${files.length} submissions` : "submission"}</button>
+              <button className="app-btn app-btn-primary app-btn-full app-btn-lg mt-5" disabled={uploading || !files.length}>
+                {uploading ? uploadProgress : `Upload ${files.length > 1 ? `${files.length} submissions` : "submission"}`}
+              </button>
             </form>
           </div>
         </div>
+        </>
+        )}
       </main>
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
+import { PageLoading } from "@/components/LoadingState";
 import { api } from "@/lib/api";
 
 type ResultSubmission = {
@@ -24,11 +25,14 @@ export default function StudentResultsPage({ params }: { params: Promise<{ token
   const { token } = use(params);
   const [data, setData] = useState<ResultsPayload | null>(null);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     api<ResultsPayload>(`/public/results/${token}`)
       .then(setData)
-      .catch((err) => setError(err instanceof Error ? err.message : "Could not load results"));
+      .catch((err) => setError(err instanceof Error ? err.message : "Could not load results"))
+      .finally(() => setLoading(false));
   }, [token]);
 
   return (
@@ -43,6 +47,9 @@ export default function StudentResultsPage({ params }: { params: Promise<{ token
 
         {error && <div className="mt-6 rounded-xl border border-[#f8717159] bg-[#f8717112] px-4 py-3 text-sm text-[#FCA5A5]">{error}</div>}
 
+        {loading && !data ? (
+          <PageLoading title="Loading results" detail="Fetching returned assignments for this student link." />
+        ) : (
         <section className="mt-6 space-y-4">
           {data?.submissions.map((submission) => {
             const percent = submission.score != null && submission.max_score ? Math.round((submission.score / submission.max_score) * 100) : null;
@@ -72,6 +79,7 @@ export default function StudentResultsPage({ params }: { params: Promise<{ token
             </div>
           )}
         </section>
+        )}
       </main>
     </div>
   );

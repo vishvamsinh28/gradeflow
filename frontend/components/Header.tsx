@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { api, clearAuthToken } from "@/lib/api";
 
 export function Header() {
   const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
 
   async function logout() {
+    setSigningOut(true);
     try {
       await api<void>("/auth/logout", { method: "POST" });
     } finally {
@@ -32,8 +35,9 @@ export function Header() {
           <button
             onClick={logout}
             className="app-btn app-btn-ghost"
+            disabled={signingOut}
           >
-            Sign out
+            {signingOut ? "Signing out..." : "Sign out"}
           </button>
         </div>
       </div>

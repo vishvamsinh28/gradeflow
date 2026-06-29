@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Header } from "@/components/Header";
+import { InlineLoading, PageLoading } from "@/components/LoadingState";
 import { api } from "@/lib/api";
 
 type StudentHistory = {
@@ -27,11 +28,14 @@ export default function StudentPage() {
   const { id, studentId } = useParams<{ id: string; studentId: string }>();
   const [data, setData] = useState<StudentHistory | null>(null);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     api<StudentHistory>(`/classes/${id}/students/${studentId}`)
       .then(setData)
-      .catch((err) => setError(err instanceof Error ? err.message : "Could not load student"));
+      .catch((err) => setError(err instanceof Error ? err.message : "Could not load student"))
+      .finally(() => setLoading(false));
   }, [id, studentId]);
 
   const scored = data?.submissions.filter((submission) => submission.score != null && submission.max_score) ?? [];
@@ -52,6 +56,10 @@ export default function StudentPage() {
 
         {error && <div className="mt-6 rounded-xl border border-[#f8717159] bg-[#f8717112] px-4 py-3 text-sm text-[#FCA5A5]">{error}</div>}
 
+        {loading && !data ? (
+          <PageLoading title="Loading student" detail="Fetching submission history and review status." />
+        ) : (
+        <>
         <section className="mt-6 grid gap-4 sm:grid-cols-3">
           <Metric value={data?.submissions.length ?? 0} label="Submissions" />
           <Metric value={`${average}%`} label="Average" tone="teal" />
@@ -70,9 +78,11 @@ export default function StudentPage() {
                 <div className="font-mono text-sm text-[#00C9A7]">{submission.score != null ? `${submission.score} / ${submission.max_score}` : "Not graded"}</div>
               </Link>
             ))}
-            {!data?.submissions.length && <p className="text-sm text-[#8496B0]">No submissions yet.</p>}
+            {loading ? <InlineLoading rows={3} /> : !data?.submissions.length && <p className="text-sm text-[#8496B0]">No submissions yet.</p>}
           </div>
         </section>
+        </>
+        )}
       </main>
     </div>
   );

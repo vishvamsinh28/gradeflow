@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { Header } from "@/components/Header";
+import { PageLoading } from "@/components/LoadingState";
 import { useToast } from "@/components/ToastProvider";
 import { api } from "@/lib/api";
 import { AuditLog, TeacherSettings } from "@/lib/types";
@@ -15,10 +16,12 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<TeacherSettings | null>(null);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   async function load() {
     try {
+      if (!settings) setLoading(true);
       const [settingsRow, auditRows] = await Promise.all([
         api<TeacherSettings>("/settings"),
         api<AuditLog[]>("/settings/audit-logs"),
@@ -29,6 +32,8 @@ export default function SettingsPage() {
       const message = err instanceof Error ? err.message : "Could not load settings";
       setError(message);
       notify(message, "error");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -69,7 +74,10 @@ export default function SettingsPage() {
 
         {error && <div className="mt-6 rounded-xl border border-[#f8717159] bg-[#f8717112] px-4 py-3 text-sm text-[#FCA5A5]">{error}</div>}
 
-        <div className="mt-6 grid items-start gap-6 lg:grid-cols-[1fr_420px]">
+        {loading && !settings ? (
+          <PageLoading title="Loading settings" detail="Fetching grading defaults and recent audit activity." />
+        ) : (
+        <div className="mt-6 space-y-6">
           <form className={panelClass} onSubmit={save}>
             <div className="mb-6">
               <h2 className="font-display text-2xl font-semibold">Grading configuration</h2>
@@ -113,10 +121,11 @@ export default function SettingsPage() {
                   <div className="mt-1 text-xs text-[#8496B0]">{new Date(log.created_at).toLocaleString()}</div>
                 </div>
               ))}
-              {!logs.length && <div className="rounded-xl border border-dashed border-[#8496b033] bg-[#0B182966] p-6 text-sm text-[#8496B0]">No audit events yet.</div>}
+              {loading ? null : !logs.length && <div className="rounded-xl border border-dashed border-[#8496b033] bg-[#0B182966] p-6 text-sm text-[#8496B0]">No audit events yet.</div>}
             </div>
           </aside>
         </div>
+        )}
       </main>
     </div>
   );

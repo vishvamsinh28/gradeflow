@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
+import { InlineLoading } from "@/components/LoadingState";
 import { useToast } from "@/components/ToastProvider";
 import { api } from "@/lib/api";
 
@@ -24,15 +25,19 @@ export default function ReviewPage() {
   const { notify } = useToast();
   const [items, setItems] = useState<ReviewQueueItem[]>([]);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
 
   async function load() {
     try {
+      if (!items.length) setLoading(true);
       setItems(await api<ReviewQueueItem[]>("/submissions/review-queue"));
     } catch (err) {
       const message = err instanceof Error ? err.message : "Could not load review queue";
       setError(message);
       notify(message, "error");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -83,7 +88,9 @@ export default function ReviewPage() {
             <Link className="app-btn app-btn-secondary" href="/dashboard">Dashboard</Link>
           </div>
 
-          {items.length ? (
+          {loading ? (
+            <InlineLoading rows={4} />
+          ) : items.length ? (
             <div className="grid gap-3">
               {items.map((item) => {
                 const confidence = item.confidence != null ? Math.round(item.confidence * 100) : null;
