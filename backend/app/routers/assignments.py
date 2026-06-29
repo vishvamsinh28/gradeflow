@@ -54,6 +54,7 @@ async def upload_submission(
     assignment_id: str,
     file: UploadFile = File(...),
     student_id: str | None = Form(default=None),
+    student_name: str | None = Form(default=None),
     user=Depends(get_current_user),
     db: Client = Depends(get_supabase),
 ):
@@ -62,6 +63,13 @@ async def upload_submission(
         student = db.table("students").select("id").eq("id", student_id).eq("class_id", assignment["class_id"]).limit(1).execute()
         if not student.data:
             raise HTTPException(status_code=400, detail="Student does not belong to this class")
+    elif student_name and student_name.strip():
+        student = (
+            db.table("students")
+            .insert({"class_id": assignment["class_id"], "name": student_name.strip()})
+            .execute()
+        )
+        student_id = student.data[0]["id"]
     storage = SubmissionStorage(db)
     path = await storage.upload(user["id"], assignment_id, file)
     response = db.table("submissions").insert(

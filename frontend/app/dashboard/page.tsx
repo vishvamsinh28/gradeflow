@@ -94,7 +94,7 @@ export default function Dashboard() {
                 <div className="flex items-start justify-between gap-4">
                   <span className="rounded-full border border-[#00c9a733] bg-[#00c9a714] px-2.5 py-1 text-[11px] font-semibold text-[#00C9A7]">{item.subject}</span>
                   <button
-                    className="rounded-lg border border-[#f871714d] px-2.5 py-1 text-xs font-semibold text-[#F87171] transition hover:bg-[#f8717114]"
+                    className="app-btn app-btn-danger app-btn-sm"
                     onClick={() => deleteClass(item.id, item.name)}
                     type="button"
                   >
@@ -141,7 +141,7 @@ export default function Dashboard() {
               <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Grade level</span>
               <input className={inputClass} value={grade} onChange={(event) => setGrade(event.target.value)} placeholder="Grade 8" />
             </label>
-            <button className="mt-6 w-full rounded-xl bg-[#00C9A7] px-5 py-3 font-display font-bold text-[#0B1829] transition hover:-translate-y-0.5 hover:bg-[#00A88C]">Create class</button>
+            <button className="app-btn app-btn-primary app-btn-full app-btn-lg mt-6">Create class</button>
           </form>
         </div>
       </main>

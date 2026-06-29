@@ -73,7 +73,7 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
           type="button"
           aria-label="Close"
           onClick={onClose}
-          className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-lg border border-[#8496b026] text-[#8496B0] transition hover:border-[#8496b066] hover:text-[#F8FAFC]"
+          className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-[10px] border border-[#8496b026] text-[#8496B0] transition hover:border-[#8496b066] hover:text-[#F8FAFC]"
         >
           ×
         </button>
@@ -154,7 +154,7 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
         {error && <div className="mt-4 rounded-xl border border-[#f8717159] bg-[#f8717112] px-4 py-3 text-sm text-[#FCA5A5]">{error}</div>}
 
         <button
-          className="mt-6 w-full rounded-xl bg-[#00C9A7] px-5 py-3 font-display font-bold text-[#0B1829] transition hover:-translate-y-0.5 hover:bg-[#00A88C] disabled:cursor-not-allowed disabled:opacity-60"
+          className="app-btn app-btn-primary app-btn-full app-btn-lg mt-6"
           disabled={busy}
         >
           {busy ? "Working…" : mode === "login" ? "Sign in" : "Create account"}

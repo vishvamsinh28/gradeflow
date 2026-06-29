@@ -24,7 +24,7 @@ export function Header() {
           </span>
           <button
             onClick={logout}
-            className="rounded-lg border border-[#8496b04d] px-4 py-2 text-sm font-semibold text-[#E2EAF4] transition hover:border-[#8496B0] hover:bg-[#8496b00f]"
+            className="app-btn app-btn-ghost"
           >
             Sign out
           </button>

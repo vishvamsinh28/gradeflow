@@ -113,7 +113,7 @@ export default function ClassPage() {
             <MetricMini value={data?.assignments?.length ?? 0} label="Assignments" />
             {data && (
               <button
-                className="rounded-xl border border-[#f871714d] px-4 py-3 text-sm font-semibold text-[#F87171] transition hover:bg-[#f8717114]"
+                className="app-btn app-btn-danger app-btn-lg"
                 onClick={deleteClass}
                 type="button"
               >
@@ -137,25 +137,25 @@ export default function ClassPage() {
               </div>
               <div className="space-y-3">
                 {data?.assignments?.map((assignment) => (
-	                  <div
-	                    key={assignment.id}
-	                    className="group flex items-center justify-between gap-4 rounded-xl border border-[#8496b01f] bg-[#0B1829] p-4 transition hover:border-[#00c9a759]"
-	                  >
-	                    <Link href={`/assignments/${assignment.id}`} className="min-w-0 flex-1">
-	                      <strong className="font-display font-semibold transition hover:text-[#00C9A7]">{assignment.title}</strong>
-	                      <div className="mt-1 text-xs text-[#8496B0]">{assignment.total_points} points</div>
-	                    </Link>
-	                    <div className="flex items-center gap-3">
-	                      <span className="rounded-full bg-[#00c9a714] px-2.5 py-1 text-[11px] font-semibold capitalize text-[#00C9A7]">{assignment.status}</span>
-	                      <button
-	                        className="rounded-lg border border-[#f871714d] px-2.5 py-1 text-xs font-semibold text-[#F87171] transition hover:bg-[#f8717114]"
-	                        onClick={() => deleteAssignment(assignment.id, assignment.title)}
-	                        type="button"
-	                      >
-	                        Delete
-	                      </button>
-	                    </div>
-	                  </div>
+                  <div
+                    key={assignment.id}
+                    className="group flex items-center justify-between gap-4 rounded-xl border border-[#8496b01f] bg-[#0B1829] p-4 transition hover:border-[#00c9a759]"
+                  >
+                    <Link href={`/assignments/${assignment.id}`} className="min-w-0 flex-1">
+                      <strong className="font-display font-semibold transition hover:text-[#00C9A7]">{assignment.title}</strong>
+                      <div className="mt-1 text-xs text-[#8496B0]">{assignment.total_points} points</div>
+                    </Link>
+                    <div className="flex items-center gap-3">
+                      <span className="rounded-full bg-[#00c9a714] px-2.5 py-1 text-[11px] font-semibold capitalize text-[#00C9A7]">{assignment.status}</span>
+                      <button
+                        className="app-btn app-btn-danger app-btn-sm"
+                        onClick={() => deleteAssignment(assignment.id, assignment.title)}
+                        type="button"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
                 ))}
                 {!data?.assignments?.length && <EmptyState icon="📝" title="No assignments yet" text="Use the form below to create your first answer key and rubric." />}
               </div>
@@ -187,7 +187,7 @@ export default function ClassPage() {
                   <textarea className={textareaClass} value={rubric} onChange={(event) => setRubric(event.target.value)} />
                 </label>
               </div>
-              <button className="mt-5 rounded-xl bg-[#00C9A7] px-5 py-3 font-display font-bold text-[#0B1829] transition hover:-translate-y-0.5 hover:bg-[#00A88C]">Create assignment</button>
+              <button className="app-btn app-btn-primary app-btn-lg mt-5">Create assignment</button>
             </form>
           </section>
 
@@ -198,24 +198,24 @@ export default function ClassPage() {
                 <div><h2 className="font-display text-xl font-semibold">Add student</h2><p className="text-xs text-[#8496B0]">Build the class roster.</p></div>
               </div>
               <input className={inputClass} required value={studentName} onChange={(event) => setStudentName(event.target.value)} placeholder="Student name" />
-              <button className="mt-4 w-full rounded-xl border border-[#00c9a74d] bg-[#00c9a714] px-5 py-3 font-display font-semibold text-[#00C9A7] transition hover:bg-[#00c9a724]">Add student</button>
+              <button className="app-btn app-btn-secondary app-btn-full app-btn-lg mt-4">Add student</button>
             </form>
 
             <div className={panelClass}>
               <div className="mb-4 flex items-center justify-between"><h2 className="font-display text-xl font-semibold">Students</h2><span className="font-mono text-xs text-[#8496B0]">{data?.students?.length ?? 0}</span></div>
               <div className="space-y-2">
                 {data?.students?.map((student, index) => (
-	                  <div className="flex items-center gap-3 rounded-xl border border-[#8496b01a] bg-[#0B1829] px-3 py-3" key={student.id}>
-	                    <div className="grid h-8 w-8 place-items-center rounded-full bg-[#00c9a714] font-mono text-[11px] text-[#00C9A7]">{String(index + 1).padStart(2, "0")}</div>
-	                    <span className="flex-1 text-sm text-[#E2EAF4]">{student.name}</span>
-	                    <button
-	                      className="rounded-lg border border-[#f871714d] px-2.5 py-1 text-xs font-semibold text-[#F87171] transition hover:bg-[#f8717114]"
-	                      onClick={() => deleteStudent(student.id, student.name)}
-	                      type="button"
-	                    >
-	                      Delete
-	                    </button>
-	                  </div>
+                  <div className="flex items-center gap-3 rounded-xl border border-[#8496b01a] bg-[#0B1829] px-3 py-3" key={student.id}>
+                    <div className="grid h-8 w-8 place-items-center rounded-full bg-[#00c9a714] font-mono text-[11px] text-[#00C9A7]">{String(index + 1).padStart(2, "0")}</div>
+                    <span className="flex-1 text-sm text-[#E2EAF4]">{student.name}</span>
+                    <button
+                      className="app-btn app-btn-danger app-btn-sm"
+                      onClick={() => deleteStudent(student.id, student.name)}
+                      type="button"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 ))}
                 {!data?.students?.length && <p className="text-sm text-[#8496B0]">No students yet.</p>}
               </div>

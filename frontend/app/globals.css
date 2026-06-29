@@ -67,6 +67,94 @@ button {
   cursor: pointer;
 }
 
+.app-btn {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  display: inline-flex;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  gap: 8px;
+  justify-content: center;
+  line-height: 1;
+  min-height: 42px;
+  padding: 0 16px;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    opacity 150ms ease,
+    transform 150ms ease;
+  white-space: nowrap;
+}
+
+.app-btn:hover {
+  transform: translateY(-1px);
+}
+
+.app-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+}
+
+.app-btn-sm {
+  font-size: 12px;
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.app-btn-lg {
+  font-size: 15px;
+  min-height: 48px;
+  padding: 0 22px;
+}
+
+.app-btn-full {
+  width: 100%;
+}
+
+.app-btn-primary {
+  background: var(--teal);
+  color: var(--navy);
+}
+
+.app-btn-primary:hover {
+  background: var(--teal-dim);
+}
+
+.app-btn-secondary {
+  background: rgba(0, 201, 167, 0.08);
+  border-color: rgba(0, 201, 167, 0.3);
+  color: var(--teal);
+}
+
+.app-btn-secondary:hover {
+  background: rgba(0, 201, 167, 0.14);
+}
+
+.app-btn-ghost {
+  background: transparent;
+  border-color: rgba(132, 150, 176, 0.3);
+  color: var(--white-dim);
+}
+
+.app-btn-ghost:hover {
+  background: rgba(132, 150, 176, 0.06);
+  border-color: rgba(132, 150, 176, 0.65);
+}
+
+.app-btn-danger {
+  background: rgba(248, 113, 113, 0.08);
+  border-color: rgba(248, 113, 113, 0.3);
+  color: var(--red);
+}
+
+.app-btn-danger:hover {
+  background: rgba(248, 113, 113, 0.14);
+}
+
 ::selection {
   background: rgba(0, 201, 167, 0.28);
   color: var(--white);

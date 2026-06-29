@@ -7,8 +7,8 @@ import { api } from "@/lib/api";
 
 type AuthMode = "login" | "register";
 
-const primaryButton = "inline-flex items-center justify-center rounded-[10px] bg-[#00C9A7] px-8 py-3.5 font-display text-base font-bold text-[#0B1829] transition hover:-translate-y-0.5 hover:bg-[#00A88C]";
-const ghostButton = "inline-flex items-center justify-center rounded-[10px] border border-[#8496b04d] bg-transparent px-7 py-3.5 font-display text-base font-medium text-[#E2EAF4] transition hover:border-[#8496B0] hover:bg-[#8496b00f]";
+const primaryButton = "app-btn app-btn-primary app-btn-lg";
+const ghostButton = "app-btn app-btn-ghost app-btn-lg";
 
 export default function Home() {
   const router = useRouter();
@@ -56,7 +56,7 @@ export default function Home() {
         </ul>
         <button
           onClick={() => openAuth("register")}
-          className="rounded-lg bg-[#00C9A7] px-5 py-2 font-display text-sm font-semibold text-[#0B1829] transition hover:bg-[#00A88C]"
+          className="app-btn app-btn-primary"
         >
           Start free trial
         </button>

@@ -80,7 +80,7 @@ export default function SubmissionPage() {
             {data && <StatusBadge status={data.status} />}
             {data && (
               <button
-                className="rounded-lg border border-[#f871714d] px-4 py-2 text-sm font-semibold text-[#F87171] transition hover:bg-[#f8717114]"
+                className="app-btn app-btn-danger"
                 onClick={deleteSubmission}
                 type="button"
               >
@@ -149,7 +149,7 @@ export default function SubmissionPage() {
                 <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Teacher note</span>
                 <textarea className={textareaClass} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional note for the student" />
               </label>
-              <button disabled={saving} className="mt-5 w-full rounded-xl bg-[#00C9A7] px-5 py-3 font-display font-bold text-[#0B1829] transition hover:-translate-y-0.5 hover:bg-[#00A88C] disabled:cursor-not-allowed disabled:opacity-60">{saving ? "Saving…" : "Approve result"}</button>
+              <button disabled={saving} className="app-btn app-btn-primary app-btn-full app-btn-lg mt-5">{saving ? "Saving…" : "Approve result"}</button>
             </form>
           </aside>
         </div>
