@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
 import { api } from "@/lib/api";
 import { Submission } from "@/lib/types";
@@ -13,6 +13,7 @@ const textareaClass = "app-textarea min-h-[100px] w-full resize-y rounded-xl bor
 
 export default function SubmissionPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [data, setData] = useState<Submission | null>(null);
   const [score, setScore] = useState("");
   const [note, setNote] = useState("");
@@ -51,6 +52,17 @@ export default function SubmissionPage() {
     }
   }
 
+  async function deleteSubmission() {
+    if (!data || !window.confirm(`Delete submission "${data.student?.name || data.original_filename}"?`)) return;
+    setError("");
+    try {
+      await api<void>(`/submissions/${id}`, { method: "DELETE" });
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete submission");
+    }
+  }
+
   const confidence = data?.confidence != null ? Math.round(data.confidence * 100) : null;
 
   return (
@@ -64,7 +76,18 @@ export default function SubmissionPage() {
             <h1 className="font-display text-4xl font-bold tracking-[-1.5px] sm:text-5xl">{data?.student?.name || data?.original_filename || "Submission"}</h1>
             <p className="mt-3 text-[#8496B0]">{data?.score != null ? `${data.score} / ${data.max_score} points` : "Not graded yet"}</p>
           </div>
-          {data && <StatusBadge status={data.status} />}
+          <div className="flex flex-wrap items-center gap-3">
+            {data && <StatusBadge status={data.status} />}
+            {data && (
+              <button
+                className="rounded-lg border border-[#f871714d] px-4 py-2 text-sm font-semibold text-[#F87171] transition hover:bg-[#f8717114]"
+                onClick={deleteSubmission}
+                type="button"
+              >
+                Delete submission
+              </button>
+            )}
+          </div>
         </div>
 
         {error && <div className="mt-6 rounded-xl border border-[#f8717159] bg-[#f8717112] px-4 py-3 text-sm text-[#FCA5A5]">{error}</div>}

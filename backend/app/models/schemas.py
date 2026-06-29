@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 
 class APIModel(BaseModel):
@@ -59,12 +59,18 @@ class ReviewUpdate(APIModel):
 class QuestionGrade(APIModel):
     question_number: str
     student_work: str = ""
-    score: float = 0
-    max_score: float = 0
+    score: float = Field(default=0, ge=0)
+    max_score: float = Field(default=0, ge=0)
     is_correct: bool = False
     feedback: str = ""
     confidence: float = Field(default=0, ge=0, le=1)
     error_category: str | None = None
+
+    @model_validator(mode="after")
+    def score_must_fit_maximum(self) -> "QuestionGrade":
+        if self.score > self.max_score:
+            raise ValueError("Question score cannot exceed question maximum")
+        return self
 
 
 class ExtractionResult(APIModel):
@@ -75,7 +81,20 @@ class ExtractionResult(APIModel):
 
 class GradingResult(APIModel):
     questions: list[QuestionGrade] = Field(default_factory=list)
-    score: float = 0
-    max_score: float = 0
+    score: float = Field(default=0, ge=0)
+    max_score: float = Field(default=0, ge=0)
     overall_feedback: str = ""
     confidence: float = Field(default=0, ge=0, le=1)
+
+    @model_validator(mode="after")
+    def totals_must_match_questions(self) -> "GradingResult":
+        if self.score > self.max_score:
+            raise ValueError("Total score cannot exceed total maximum")
+        if self.questions:
+            question_score = sum(question.score for question in self.questions)
+            question_max = sum(question.max_score for question in self.questions)
+            if abs(question_score - self.score) > 0.01:
+                raise ValueError("Question scores must add up to total score")
+            if abs(question_max - self.max_score) > 0.01:
+                raise ValueError("Question maxima must add up to total maximum")
+        return self

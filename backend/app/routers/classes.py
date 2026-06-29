@@ -4,6 +4,7 @@ from supabase import Client
 from app.db.supabase import get_supabase
 from app.dependencies import get_current_user, owned_class
 from app.models.schemas import ClassCreate, StudentCreate
+from app.services.storage import SubmissionStorage
 
 router = APIRouter(prefix="/classes", tags=["classes"])
 
@@ -12,7 +13,7 @@ router = APIRouter(prefix="/classes", tags=["classes"])
 def list_classes(user=Depends(get_current_user), db: Client = Depends(get_supabase)):
     response = (
         db.table("classes")
-        .select("*")
+        .select("*,students(id),assignments(id)")
         .eq("owner_id", user["id"])
         .order("created_at", desc=True)
         .execute()
@@ -51,3 +52,34 @@ def add_student(
     owned_class(db, class_id, user["id"])
     response = db.table("students").insert({"class_id": class_id, **payload.model_dump()}).execute()
     return response.data[0]
+
+
+@router.delete("/{class_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_class(class_id: str, user=Depends(get_current_user), db: Client = Depends(get_supabase)):
+    owned_class(db, class_id, user["id"])
+    assignments = db.table("assignments").select("id").eq("class_id", class_id).execute().data
+    assignment_ids = [assignment["id"] for assignment in assignments]
+    if assignment_ids:
+        submissions = (
+            db.table("submissions")
+            .select("storage_path")
+            .in_("assignment_id", assignment_ids)
+            .execute()
+            .data
+        )
+        SubmissionStorage(db).delete_many([row["storage_path"] for row in submissions])
+    db.table("classes").delete().eq("id", class_id).execute()
+
+
+@router.delete("/{class_id}/students/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_student(
+    class_id: str,
+    student_id: str,
+    user=Depends(get_current_user),
+    db: Client = Depends(get_supabase),
+):
+    owned_class(db, class_id, user["id"])
+    student = db.table("students").select("id").eq("id", student_id).eq("class_id", class_id).limit(1).execute()
+    if not student.data:
+        return
+    db.table("students").delete().eq("id", student_id).execute()

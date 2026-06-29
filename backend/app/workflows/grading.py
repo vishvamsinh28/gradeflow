@@ -177,11 +177,11 @@ class GradingWorkflow:
         ).eq("id", submission_id).execute()
         try:
             return self.graph.invoke({"submission_id": submission_id})
-        except Exception as exc:
+        except Exception:
             self.db.table("submissions").update(
                 {
                     "status": "failed",
-                    "error_message": str(exc)[:1000],
+                    "error_message": "Grading failed. Please retry or review the submission manually.",
                     "updated_at": datetime.now(timezone.utc).isoformat(),
                 }
             ).eq("id", submission_id).execute()

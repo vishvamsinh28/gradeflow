@@ -174,7 +174,7 @@ persist_result
 
 ## Production notes
 
-- Put frontend and API behind the same parent domain, enable `COOKIE_SECURE=true`, and add CSRF protection for state-changing endpoints.
+- Put frontend and API behind the same parent domain, enable `COOKIE_SECURE=true`, and keep the state-changing endpoint Origin checks enabled. Add per-request CSRF tokens if you need stronger browser-side request forgery protection.
 - Replace synchronous grading with a worker/queue for larger batches.
 - Add malware scanning and stricter file validation before processing uploads.
 - Add signed download URLs and retention/deletion policies for student work.

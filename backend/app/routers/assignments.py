@@ -75,3 +75,15 @@ async def upload_submission(
         }
     ).execute()
     return response.data[0]
+
+
+@router.delete("/assignments/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_assignment(
+    assignment_id: str,
+    user=Depends(get_current_user),
+    db: Client = Depends(get_supabase),
+):
+    owned_assignment(db, assignment_id, user["id"])
+    submissions = db.table("submissions").select("storage_path").eq("assignment_id", assignment_id).execute().data
+    SubmissionStorage(db).delete_many([row["storage_path"] for row in submissions])
+    db.table("assignments").delete().eq("id", assignment_id).execute()

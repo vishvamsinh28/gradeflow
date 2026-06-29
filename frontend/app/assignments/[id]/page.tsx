@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
 import { api } from "@/lib/api";
 import { Assignment, Submission } from "@/lib/types";
@@ -21,6 +21,7 @@ const selectClass = "app-select w-full rounded-xl border border-[#8496b02e] bg-[
 
 export default function AssignmentPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
@@ -77,6 +78,28 @@ export default function AssignmentPage() {
     }
   }
 
+  async function deleteAssignment() {
+    if (!assignment || !window.confirm(`Delete "${assignment.title}" and all of its submissions?`)) return;
+    setError("");
+    try {
+      await api<void>(`/assignments/${id}`, { method: "DELETE" });
+      router.push(`/classes/${assignment.class_id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete assignment");
+    }
+  }
+
+  async function deleteSubmission(submissionId: string, label: string) {
+    if (!window.confirm(`Delete submission "${label}"?`)) return;
+    setError("");
+    try {
+      await api<void>(`/submissions/${submissionId}`, { method: "DELETE" });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete submission");
+    }
+  }
+
   return (
     <div className="app-background min-h-screen">
       <Header />
@@ -88,7 +111,18 @@ export default function AssignmentPage() {
             <h1 className="font-display text-4xl font-bold tracking-[-1.5px] sm:text-5xl">{assignment?.title ?? "Assignment"}</h1>
             <p className="mt-3 text-[#8496B0]">{assignment?.total_points ?? 0} points · upload images or PDFs</p>
           </div>
-          <span className="w-fit rounded-full border border-[#00c9a733] bg-[#00c9a714] px-3 py-1.5 text-xs font-semibold capitalize text-[#00C9A7]">{assignment?.status || "active"}</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="w-fit rounded-full border border-[#00c9a733] bg-[#00c9a714] px-3 py-1.5 text-xs font-semibold capitalize text-[#00C9A7]">{assignment?.status || "active"}</span>
+            {assignment && (
+              <button
+                className="rounded-lg border border-[#f871714d] px-4 py-2 text-sm font-semibold text-[#F87171] transition hover:bg-[#f8717114]"
+                onClick={deleteAssignment}
+                type="button"
+              >
+                Delete assignment
+              </button>
+            )}
+          </div>
         </div>
 
         {error && <div className="mt-6 rounded-xl border border-[#f8717159] bg-[#f8717112] px-4 py-3 text-sm text-[#FCA5A5]">{error}</div>}
@@ -124,8 +158,16 @@ export default function AssignmentPage() {
                       className="rounded-lg border border-[#00c9a74d] bg-[#00c9a714] px-4 py-2 text-sm font-semibold text-[#00C9A7] transition hover:bg-[#00c9a724] disabled:cursor-not-allowed disabled:opacity-50"
                       disabled={submission.status === "processing" || gradingId === submission.id}
                       onClick={() => grade(submission.id)}
+                      type="button"
                     >
                       {gradingId === submission.id ? "Grading…" : "Grade"}
+                    </button>
+                    <button
+                      className="rounded-lg border border-[#f871714d] px-4 py-2 text-sm font-semibold text-[#F87171] transition hover:bg-[#f8717114]"
+                      onClick={() => deleteSubmission(submission.id, submission.students?.name || submission.original_filename)}
+                      type="button"
+                    >
+                      Delete
                     </button>
                   </div>
                 </div>

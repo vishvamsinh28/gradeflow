@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
 import { api } from "@/lib/api";
 import { Classroom } from "@/lib/types";
@@ -16,6 +16,7 @@ const panelClass = "rounded-2xl border border-[#8496b01f] bg-[#132338] p-5 shado
 
 export default function ClassPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [data, setData] = useState<Classroom | null>(null);
   const [studentName, setStudentName] = useState("");
   const [title, setTitle] = useState("");
@@ -63,6 +64,39 @@ export default function ClassPage() {
     }
   }
 
+  async function deleteClass() {
+    if (!data || !window.confirm(`Delete "${data.name}" and everything inside it?`)) return;
+    setError("");
+    try {
+      await api<void>(`/classes/${id}`, { method: "DELETE" });
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete class");
+    }
+  }
+
+  async function deleteAssignment(assignmentId: string, assignmentTitle: string) {
+    if (!window.confirm(`Delete assignment "${assignmentTitle}" and its submissions?`)) return;
+    setError("");
+    try {
+      await api<void>(`/assignments/${assignmentId}`, { method: "DELETE" });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete assignment");
+    }
+  }
+
+  async function deleteStudent(studentId: string, name: string) {
+    if (!window.confirm(`Delete student "${name}"? Existing submissions will become unassigned.`)) return;
+    setError("");
+    try {
+      await api<void>(`/classes/${id}/students/${studentId}`, { method: "DELETE" });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete student");
+    }
+  }
+
   return (
     <div className="app-background min-h-screen">
       <Header />
@@ -74,9 +108,18 @@ export default function ClassPage() {
             <h1 className="font-display text-4xl font-bold tracking-[-1.5px] sm:text-5xl">{data?.name ?? "Class"}</h1>
             <p className="mt-3 text-[#8496B0]">{data?.grade_level || "Grade level not specified"}</p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <MetricMini value={data?.students?.length ?? 0} label="Students" />
             <MetricMini value={data?.assignments?.length ?? 0} label="Assignments" />
+            {data && (
+              <button
+                className="rounded-xl border border-[#f871714d] px-4 py-3 text-sm font-semibold text-[#F87171] transition hover:bg-[#f8717114]"
+                onClick={deleteClass}
+                type="button"
+              >
+                Delete class
+              </button>
+            )}
           </div>
         </div>
 
@@ -94,20 +137,25 @@ export default function ClassPage() {
               </div>
               <div className="space-y-3">
                 {data?.assignments?.map((assignment) => (
-                  <Link
-                    key={assignment.id}
-                    href={`/assignments/${assignment.id}`}
-                    className="group flex items-center justify-between gap-4 rounded-xl border border-[#8496b01f] bg-[#0B1829] p-4 transition hover:border-[#00c9a759]"
-                  >
-                    <div>
-                      <strong className="font-display font-semibold">{assignment.title}</strong>
-                      <div className="mt-1 text-xs text-[#8496B0]">{assignment.total_points} points</div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="rounded-full bg-[#00c9a714] px-2.5 py-1 text-[11px] font-semibold capitalize text-[#00C9A7]">{assignment.status}</span>
-                      <span className="text-[#8496B0] transition group-hover:translate-x-1 group-hover:text-[#00C9A7]">→</span>
-                    </div>
-                  </Link>
+	                  <div
+	                    key={assignment.id}
+	                    className="group flex items-center justify-between gap-4 rounded-xl border border-[#8496b01f] bg-[#0B1829] p-4 transition hover:border-[#00c9a759]"
+	                  >
+	                    <Link href={`/assignments/${assignment.id}`} className="min-w-0 flex-1">
+	                      <strong className="font-display font-semibold transition hover:text-[#00C9A7]">{assignment.title}</strong>
+	                      <div className="mt-1 text-xs text-[#8496B0]">{assignment.total_points} points</div>
+	                    </Link>
+	                    <div className="flex items-center gap-3">
+	                      <span className="rounded-full bg-[#00c9a714] px-2.5 py-1 text-[11px] font-semibold capitalize text-[#00C9A7]">{assignment.status}</span>
+	                      <button
+	                        className="rounded-lg border border-[#f871714d] px-2.5 py-1 text-xs font-semibold text-[#F87171] transition hover:bg-[#f8717114]"
+	                        onClick={() => deleteAssignment(assignment.id, assignment.title)}
+	                        type="button"
+	                      >
+	                        Delete
+	                      </button>
+	                    </div>
+	                  </div>
                 ))}
                 {!data?.assignments?.length && <EmptyState icon="📝" title="No assignments yet" text="Use the form below to create your first answer key and rubric." />}
               </div>
@@ -157,10 +205,17 @@ export default function ClassPage() {
               <div className="mb-4 flex items-center justify-between"><h2 className="font-display text-xl font-semibold">Students</h2><span className="font-mono text-xs text-[#8496B0]">{data?.students?.length ?? 0}</span></div>
               <div className="space-y-2">
                 {data?.students?.map((student, index) => (
-                  <div className="flex items-center gap-3 rounded-xl border border-[#8496b01a] bg-[#0B1829] px-3 py-3" key={student.id}>
-                    <div className="grid h-8 w-8 place-items-center rounded-full bg-[#00c9a714] font-mono text-[11px] text-[#00C9A7]">{String(index + 1).padStart(2, "0")}</div>
-                    <span className="text-sm text-[#E2EAF4]">{student.name}</span>
-                  </div>
+	                  <div className="flex items-center gap-3 rounded-xl border border-[#8496b01a] bg-[#0B1829] px-3 py-3" key={student.id}>
+	                    <div className="grid h-8 w-8 place-items-center rounded-full bg-[#00c9a714] font-mono text-[11px] text-[#00C9A7]">{String(index + 1).padStart(2, "0")}</div>
+	                    <span className="flex-1 text-sm text-[#E2EAF4]">{student.name}</span>
+	                    <button
+	                      className="rounded-lg border border-[#f871714d] px-2.5 py-1 text-xs font-semibold text-[#F87171] transition hover:bg-[#f8717114]"
+	                      onClick={() => deleteStudent(student.id, student.name)}
+	                      type="button"
+	                    >
+	                      Delete
+	                    </button>
+	                  </div>
                 ))}
                 {!data?.students?.length && <p className="text-sm text-[#8496B0]">No students yet.</p>}
               </div>

@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
 from app.routers import analytics, assignments, auth, classes, submissions
@@ -13,6 +14,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def require_trusted_origin_for_mutations(request: Request, call_next):
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        origin = request.headers.get("origin")
+        if origin != settings.frontend_origin:
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Request origin is not allowed"},
+            )
+    return await call_next(request)
 
 app.include_router(auth.router, prefix=settings.api_prefix)
 app.include_router(classes.router, prefix=settings.api_prefix)

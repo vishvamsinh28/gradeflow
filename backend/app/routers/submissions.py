@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 from supabase import Client
@@ -6,9 +7,11 @@ from supabase import Client
 from app.db.supabase import get_supabase
 from app.dependencies import get_current_user, owned_assignment, owned_submission
 from app.models.schemas import ReviewUpdate
+from app.services.storage import SubmissionStorage
 from app.workflows.grading import GradingWorkflow
 
 router = APIRouter(prefix="/submissions", tags=["submissions"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/{submission_id}")
@@ -43,7 +46,8 @@ def grade_submission(
     try:
         GradingWorkflow(db).run(submission_id)
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Grading failed: {exc}") from exc
+        logger.exception("Grading failed for submission %s", submission_id)
+        raise HTTPException(status_code=502, detail="Grading failed. Please retry or review the submission manually.") from exc
     submission = owned_submission(db, submission_id, user["id"])
     return {"id": submission_id, "status": submission["status"]}
 
@@ -73,3 +77,15 @@ def review_submission(
         }
     ).eq("id", submission_id).execute()
     return response.data[0]
+
+
+@router.delete("/{submission_id}", status_code=204)
+def delete_submission(
+    submission_id: str,
+    user=Depends(get_current_user),
+    db: Client = Depends(get_supabase),
+):
+    submission = owned_submission(db, submission_id, user["id"])
+    SubmissionStorage(db).delete_many([submission["storage_path"]])
+    db.table("grading_results").delete().eq("submission_id", submission_id).execute()
+    db.table("submissions").delete().eq("id", submission_id).execute()

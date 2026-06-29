@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AuthModal } from "@/components/AuthModal";
+import { api } from "@/lib/api";
 
 type AuthMode = "login" | "register";
 
@@ -9,9 +11,24 @@ const primaryButton = "inline-flex items-center justify-center rounded-[10px] bg
 const ghostButton = "inline-flex items-center justify-center rounded-[10px] border border-[#8496b04d] bg-transparent px-7 py-3.5 font-display text-base font-medium text-[#E2EAF4] transition hover:border-[#8496B0] hover:bg-[#8496b00f]";
 
 export default function Home() {
+  const router = useRouter();
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("register");
   const [barsVisible, setBarsVisible] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    api("/auth/me")
+      .then(() => {
+        if (mounted) router.replace("/dashboard");
+      })
+      .catch(() => {
+        // Stay on the public page when there is no valid session.
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [router]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setBarsVisible(true), 450);
