@@ -4,6 +4,7 @@ set -Eeuo pipefail
 BACKEND_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="$BACKEND_DIR/.env"
 SCHEMA_FILE="$BACKEND_DIR/supabase/schema.sql"
+MIGRATIONS_DIR="$BACKEND_DIR/supabase/migrations"
 
 info() {
   printf '\n\033[1;34m[db]\033[0m %s\n' "$1"
@@ -50,5 +51,13 @@ DB_URL_VALUE="$(env_value DB_URL)"
 
 info "Applying backend/supabase/schema.sql"
 psql "$DB_URL_VALUE" -v ON_ERROR_STOP=1 -f "$SCHEMA_FILE"
+
+if [ -d "$MIGRATIONS_DIR" ]; then
+  for migration in "$MIGRATIONS_DIR"/*.sql; do
+    [ -e "$migration" ] || continue
+    info "Applying ${migration#$BACKEND_DIR/}"
+    psql "$DB_URL_VALUE" -v ON_ERROR_STOP=1 -f "$migration"
+  done
+fi
 
 printf '\n\033[1;32mDatabase schema applied.\033[0m\n'

@@ -197,6 +197,325 @@ button {
   color: var(--white);
 }
 
+.toast {
+  border: 1px solid rgba(132, 150, 176, 0.28);
+  border-radius: 12px;
+  background: rgba(19, 35, 56, 0.96);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+  color: var(--white);
+  font-size: 14px;
+  line-height: 1.45;
+  padding: 14px 16px;
+}
+
+.toast-success {
+  border-color: rgba(74, 222, 128, 0.45);
+}
+
+.toast-error {
+  border-color: rgba(248, 113, 113, 0.5);
+}
+
+.toast-info {
+  border-color: rgba(0, 201, 167, 0.4);
+}
+
+.gradeflow-landing {
+  --landing-surface: #101c2c;
+  --landing-card: rgba(16, 28, 44, 0.84);
+  --landing-line: rgba(255, 255, 255, 0.1);
+}
+
+.landing-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+  background-size: 52px 52px;
+  mask-image: linear-gradient(to bottom, black, transparent 88%);
+}
+
+.landing-reveal {
+  animation: landing-rise 760ms ease both;
+}
+
+.landing-product-shell {
+  animation: landing-rise 900ms 120ms ease both;
+  perspective: 1400px;
+}
+
+.landing-panel {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04)),
+    var(--landing-card);
+  border: 1px solid var(--landing-line);
+  border-radius: 18px;
+  box-shadow:
+    0 40px 120px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+}
+
+.landing-float {
+  animation: landing-float 7s ease-in-out infinite;
+  transform: rotateX(2deg) rotateY(-6deg);
+}
+
+.landing-row {
+  align-items: center;
+  animation: landing-row-in 560ms ease both;
+  background: #091421;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 5px minmax(0, 1fr) auto;
+  padding: 13px;
+}
+
+.grade-line {
+  border-radius: 999px;
+  height: 42px;
+}
+
+.grade-chip {
+  align-items: center;
+  border-radius: 12px;
+  display: grid;
+  gap: 1px;
+  justify-items: center;
+  min-width: 72px;
+  padding: 8px 10px;
+}
+
+.grade-chip span {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+}
+
+.grade-chip strong {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 16px;
+}
+
+.grade-a {
+  background: linear-gradient(135deg, rgba(74, 222, 128, 0.22), rgba(0, 201, 167, 0.22));
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  color: #99f6c0;
+}
+
+.grade-b {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.22), rgba(0, 201, 167, 0.18));
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #a5e8ff;
+}
+
+.grade-c {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.24), rgba(251, 191, 36, 0.12));
+  border: 1px solid rgba(245, 158, 11, 0.38);
+  color: #fcd68a;
+}
+
+.grade-r {
+  background: linear-gradient(135deg, rgba(248, 113, 113, 0.24), rgba(245, 158, 11, 0.12));
+  border: 1px solid rgba(248, 113, 113, 0.38);
+  color: #fecaca;
+}
+
+.grade-gradient {
+  border: 0;
+}
+
+.grade-gradient.grade-a,
+.grade-line.grade-a {
+  background: linear-gradient(90deg, #4ade80, #00c9a7);
+}
+
+.grade-gradient.grade-b,
+.grade-line.grade-b {
+  background: linear-gradient(90deg, #38bdf8, #00c9a7);
+}
+
+.grade-gradient.grade-c,
+.grade-line.grade-c {
+  background: linear-gradient(90deg, #f59e0b, #facc15);
+}
+
+.grade-gradient.grade-r,
+.grade-line.grade-r {
+  background: linear-gradient(90deg, #f87171, #f59e0b);
+}
+
+.landing-metric,
+.mini-panel,
+.workflow-step,
+.feature-card {
+  border: 1px solid var(--landing-line);
+  border-radius: 16px;
+  background: rgba(16, 28, 44, 0.78);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.landing-metric {
+  padding: 14px;
+}
+
+.metric-green {
+  color: #72f1da;
+}
+
+.metric-amber {
+  color: #fcd68a;
+}
+
+.metric-violet {
+  color: #c4b5fd;
+}
+
+.mini-panel {
+  padding: 14px;
+}
+
+.mini-amber {
+  color: #fcd68a;
+}
+
+.mini-violet {
+  color: #c4b5fd;
+}
+
+.mini-green {
+  color: #99f6c0;
+}
+
+.insight-green {
+  background: linear-gradient(90deg, #4ade80, #00c9a7);
+}
+
+.insight-amber {
+  background: linear-gradient(90deg, #f87171, #f59e0b);
+}
+
+.insight-blue {
+  background: linear-gradient(90deg, #38bdf8, #7c5cff);
+}
+
+.workflow-step {
+  min-height: 220px;
+  padding: 24px;
+  position: relative;
+  transition:
+    border-color 180ms ease,
+    transform 180ms ease,
+    background-color 180ms ease;
+}
+
+.workflow-step::after {
+  background: linear-gradient(180deg, rgba(0, 201, 167, 0.4), transparent);
+  border-radius: 999px;
+  content: "";
+  height: 70px;
+  position: absolute;
+  right: 18px;
+  top: 18px;
+  width: 2px;
+}
+
+.workflow-step:hover,
+.feature-card:hover {
+  border-color: rgba(0, 201, 167, 0.45);
+  transform: translateY(-3px);
+}
+
+.feature-card {
+  min-height: 260px;
+  overflow: hidden;
+  padding: 26px;
+  position: relative;
+  transition:
+    border-color 180ms ease,
+    transform 180ms ease;
+}
+
+.feature-card::before {
+  border-radius: 999px;
+  content: "";
+  filter: blur(28px);
+  height: 110px;
+  opacity: 0.26;
+  position: absolute;
+  right: -28px;
+  top: -28px;
+  width: 110px;
+}
+
+.feature-mark {
+  border-radius: 12px;
+  height: 42px;
+  width: 42px;
+}
+
+.feature-cyan .feature-mark,
+.feature-cyan::before {
+  background: linear-gradient(135deg, #00c9a7, #38bdf8);
+}
+
+.feature-amber .feature-mark,
+.feature-amber::before {
+  background: linear-gradient(135deg, #f59e0b, #facc15);
+}
+
+.feature-violet .feature-mark,
+.feature-violet::before {
+  background: linear-gradient(135deg, #7c5cff, #c4b5fd);
+}
+
+.feature-blue .feature-mark,
+.feature-blue::before {
+  background: linear-gradient(135deg, #38bdf8, #2563eb);
+}
+
+.feature-green .feature-mark,
+.feature-green::before {
+  background: linear-gradient(135deg, #4ade80, #00c9a7);
+}
+
+.feature-red .feature-mark,
+.feature-red::before {
+  background: linear-gradient(135deg, #f87171, #f59e0b);
+}
+
+@keyframes landing-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes landing-row-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes landing-float {
+  0%,
+  100% {
+    transform: rotateX(2deg) rotateY(-6deg) translateY(0);
+  }
+  50% {
+    transform: rotateX(1deg) rotateY(-4deg) translateY(-10px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

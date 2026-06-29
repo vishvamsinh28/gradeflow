@@ -42,6 +42,14 @@ class StudentCreate(APIModel):
     external_id: str | None = Field(default=None, max_length=80)
 
 
+class TeacherSettingsUpdate(APIModel):
+    gemini_model: str = Field(min_length=2, max_length=120)
+    confidence_threshold: float = Field(ge=0, le=1)
+    default_subject: str = Field(min_length=2, max_length=80)
+    default_grade_level: str | None = Field(default=None, max_length=40)
+    default_grading_rules: str = Field(min_length=2, max_length=2000)
+
+
 class AssignmentCreate(APIModel):
     title: str = Field(min_length=2, max_length=160)
     description: str | None = Field(default=None, max_length=2000)
@@ -53,6 +61,15 @@ class AssignmentCreate(APIModel):
 
 class AssignmentStatusUpdate(APIModel):
     status: str = Field(pattern="^(draft|active|archived|returned)$")
+
+
+class AssignmentUpdate(APIModel):
+    title: str = Field(min_length=2, max_length=160)
+    description: str | None = Field(default=None, max_length=2000)
+    total_points: float = Field(gt=0, le=10000)
+    answer_key: dict[str, Any]
+    rubric: dict[str, Any]
+    change_note: str | None = Field(default=None, max_length=500)
 
 
 class ReviewUpdate(APIModel):

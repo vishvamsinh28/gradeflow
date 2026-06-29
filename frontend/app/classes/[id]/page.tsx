@@ -4,8 +4,9 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
+import { useToast } from "@/components/ToastProvider";
 import { api } from "@/lib/api";
-import { Classroom } from "@/lib/types";
+import { Classroom, TeacherSettings } from "@/lib/types";
 
 type QuestionDraft = {
   number: string;
@@ -32,19 +33,27 @@ const panelClass = "rounded-2xl border border-[#8496b01f] bg-[#132338] p-5 shado
 export default function ClassPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { notify } = useToast();
   const [data, setData] = useState<Classroom | null>(null);
   const [studentName, setStudentName] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [generalRules, setGeneralRules] = useState("Award method marks for a correct approach.\nDo not penalize the same arithmetic slip twice.");
+  const [generalRules, setGeneralRules] = useState("");
   const [questions, setQuestions] = useState<QuestionDraft[]>([newQuestion()]);
   const [error, setError] = useState("");
 
   async function load() {
     try {
-      setData(await api<Classroom>(`/classes/${id}`));
+      const [classroom, settings] = await Promise.all([
+        api<Classroom>(`/classes/${id}`),
+        api<TeacherSettings>("/settings"),
+      ]);
+      setData(classroom);
+      setGeneralRules((current) => current || settings.default_grading_rules);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load class");
+      const message = err instanceof Error ? err.message : "Could not load class";
+      setError(message);
+      notify(message, "error");
     }
   }
 
@@ -58,9 +67,12 @@ export default function ClassPage() {
     try {
       await api(`/classes/${id}/students`, { method: "POST", body: JSON.stringify({ name: studentName }) });
       setStudentName("");
+      notify("Student added", "success");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not add student");
+      const message = err instanceof Error ? err.message : "Could not add student";
+      setError(message);
+      notify(message, "error");
     }
   }
 
@@ -102,9 +114,12 @@ export default function ClassPage() {
       setTitle("");
       setDescription("");
       setQuestions([newQuestion()]);
+      notify("Draft assignment created", "success");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create assignment");
+      const message = err instanceof Error ? err.message : "Could not create assignment";
+      setError(message);
+      notify(message, "error");
     }
   }
 
@@ -125,9 +140,12 @@ export default function ClassPage() {
     setError("");
     try {
       await api<void>(`/classes/${id}`, { method: "DELETE" });
+      notify("Class deleted", "success");
       router.push("/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete class");
+      const message = err instanceof Error ? err.message : "Could not delete class";
+      setError(message);
+      notify(message, "error");
     }
   }
 
@@ -136,9 +154,12 @@ export default function ClassPage() {
     setError("");
     try {
       await api<void>(`/assignments/${assignmentId}`, { method: "DELETE" });
+      notify("Assignment deleted", "success");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete assignment");
+      const message = err instanceof Error ? err.message : "Could not delete assignment";
+      setError(message);
+      notify(message, "error");
     }
   }
 
@@ -147,10 +168,20 @@ export default function ClassPage() {
     setError("");
     try {
       await api<void>(`/classes/${id}/students/${studentId}`, { method: "DELETE" });
+      notify("Student deleted", "success");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete student");
+      const message = err instanceof Error ? err.message : "Could not delete student";
+      setError(message);
+      notify(message, "error");
     }
+  }
+
+  async function copyResultsLink(token?: string) {
+    if (!token) return;
+    const url = `${window.location.origin}/results/${token}`;
+    await navigator.clipboard.writeText(url);
+    notify("Student results link copied", "success");
   }
 
   return (
@@ -304,6 +335,13 @@ export default function ClassPage() {
                   <div className="flex items-center gap-3 rounded-xl border border-[#8496b01a] bg-[#0B1829] px-3 py-3" key={student.id}>
                     <div className="grid h-8 w-8 place-items-center rounded-full bg-[#00c9a714] font-mono text-[11px] text-[#00C9A7]">{String(index + 1).padStart(2, "0")}</div>
                     <Link className="flex-1 text-sm text-[#E2EAF4] transition hover:text-[#00C9A7]" href={`/classes/${id}/students/${student.id}`}>{student.name}</Link>
+                    <button
+                      className="app-btn app-btn-ghost app-btn-sm"
+                      onClick={() => copyResultsLink(student.portal_token)}
+                      type="button"
+                    >
+                      Link
+                    </button>
                     <button
                       className="app-btn app-btn-danger app-btn-sm"
                       onClick={() => deleteStudent(student.id, student.name)}

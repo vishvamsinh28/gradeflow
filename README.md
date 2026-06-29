@@ -1,6 +1,6 @@
 # GradeFlow
 
-GradeFlow is a portfolio-grade MVP for grading handwritten or typed mathematics worksheets. Teachers create classes and assignments, upload student work, and run a LangGraph workflow that uses Gemini to extract work, grade it against an answer key/rubric, estimate confidence, and route uncertain results to human review. LangSmith tracing works through the standard tracing environment variables.
+GradeFlow is an AI grading workspace for handwritten or typed worksheet submissions. Teachers create classes, build structured answer keys and rubrics, batch-upload student work, run a LangGraph grading workflow with Gemini, review uncertain results, revise rubrics, regrade submissions, return results through student links, and keep an audit trail of grading decisions. LangSmith tracing is required for workflow observability.
 
 ## Stack
 
@@ -12,16 +12,18 @@ GradeFlow is a portfolio-grade MVP for grading handwritten or typed mathematics 
 - LangGraph workflow orchestration
 - LangSmith tracing/observability
 
-## Included MVP flows
+## Product workflows
 
 1. Register and sign in as a teacher.
 2. Create classes and add students.
-3. Create an assignment with a JSON answer key and rubric.
-4. Upload an image or PDF for a student.
-5. Run the grading graph.
-6. Inspect per-question scores, feedback, confidence, and review status.
-7. View assignment-level analytics.
-8. Override the final score and mark a submission reviewed.
+3. Configure teacher settings for Gemini model, confidence threshold, and default grading rules.
+4. Create assignments with a structured question builder, answer key, and rubric.
+5. Batch-upload worksheet images or PDFs and assign submissions by student name.
+6. Run grading, inspect extraction evidence, question-level scores, feedback, confidence, and review status.
+7. Resolve low-confidence work from the cross-class review queue.
+8. Edit rubrics, save assignment versions, and regrade all existing submissions when criteria change.
+9. Approve or override final scores and return completed results to student portal links.
+10. Review audit logs for settings changes, grading runs, approvals, overrides, returns, deletes, and regrades.
 
 ## Project structure
 
@@ -137,40 +139,31 @@ calculate_confidence
 persist_result
 ```
 
-## Answer-key example
+## Assignment builder
 
-```json
-{
-  "questions": [
-    {
-      "number": "1",
-      "prompt": "Solve 2x + 3 = 11",
-      "expected_answer": "x = 4",
-      "max_score": 5
-    }
-  ]
-}
-```
+Teachers build assignments from the UI instead of typing JSON. Each question captures:
 
-## Rubric example
+- question number and prompt
+- expected answer
+- max score
+- scoring criteria
+- common mistakes
 
-```json
-{
-  "general_rules": [
-    "Award method marks when the approach is correct.",
-    "Do not penalize the same arithmetic slip twice."
-  ],
-  "questions": {
-    "1": {
-      "criteria": [
-        {"description": "Subtracts 3 from both sides", "points": 2},
-        {"description": "Divides both sides by 2", "points": 2},
-        {"description": "States x = 4", "points": 1}
-      ]
-    }
-  }
-}
-```
+GradeFlow stores that structured answer key/rubric as JSONB internally, snapshots versions on edit, and can regrade existing submissions against the latest version.
+
+## Student result links
+
+Each student has a private portal token. Teachers can copy a returned-results link from the class roster. The public results page only shows assignments marked `returned`; drafts, active grading work, archived assignments, and pending review items are hidden.
+
+## Audit and version history
+
+GradeFlow writes audit events for important teacher and system actions:
+
+- settings updates
+- assignment edits, status changes, duplicates, returns, regrades, and deletes
+- submission uploads, grading runs, approvals, teacher reviews, and deletes
+
+Assignment edits also create `assignment_versions` rows so rubric changes are traceable before regrading.
 
 ## Production notes
 
@@ -179,3 +172,4 @@ persist_result
 - Add malware scanning and stricter file validation before processing uploads.
 - Add signed download URLs and retention/deletion policies for student work.
 - Build a LangSmith evaluation dataset from teacher-approved grading examples before allowing automatic grade release.
+- Add role-based access if schools need co-teachers, department leads, or admin review.

@@ -19,6 +19,12 @@ export function Header() {
           Grade<span className="text-[#00C9A7]">Flow</span>
         </Link>
         <div className="flex items-center gap-3">
+          <Link href="/review" className="app-btn app-btn-ghost">
+            Review
+          </Link>
+          <Link href="/settings" className="app-btn app-btn-ghost">
+            Settings
+          </Link>
           <span className="hidden rounded-full border border-[#00c9a733] bg-[#00c9a714] px-3 py-1 text-xs font-semibold text-[#00C9A7] sm:inline-flex">
             Gemini + LangGraph
           </span>

@@ -4,8 +4,9 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
+import { useToast } from "@/components/ToastProvider";
 import { api } from "@/lib/api";
-import { Assignment, Submission } from "@/lib/types";
+import { Assignment, AssignmentVersion, AuditLog, Submission } from "@/lib/types";
 
 type Analytics = {
   submission_count: number;
@@ -15,33 +16,121 @@ type Analytics = {
   common_errors: { category: string; count: number }[];
 };
 
+type QuestionDraft = {
+  number: string;
+  prompt: string;
+  expectedAnswer: string;
+  maxScore: string;
+  criteria: string;
+  commonMistakes: string;
+};
+
+type AssignmentHistory = {
+  versions: AssignmentVersion[];
+  audit_logs: AuditLog[];
+};
+
 const panelClass = "rounded-2xl border border-[#8496b01f] bg-[#132338] p-5 shadow-[0_18px_48px_rgba(0,0,0,.12)] sm:p-6";
 const inputClass = "app-input w-full rounded-xl border border-[#8496b02e] bg-[#0B1829] px-4 py-3 text-sm text-[#F8FAFC]";
+const textareaClass = "app-textarea min-h-[96px] w-full resize-y rounded-xl border border-[#8496b02e] bg-[#0B1829] px-4 py-3 text-sm leading-6 text-[#E2EAF4]";
+
+function questionsFromAssignment(assignment: Assignment): QuestionDraft[] {
+  const answerQuestions = (assignment.answer_key?.questions as Record<string, unknown>[] | undefined) ?? [];
+  const rubricQuestions = (assignment.rubric?.questions as Record<string, Record<string, unknown>> | undefined) ?? {};
+  if (!answerQuestions.length) {
+    return [{ number: "1", prompt: "", expectedAnswer: "", maxScore: String(assignment.total_points || 1), criteria: "", commonMistakes: "" }];
+  }
+  return answerQuestions.map((question, index) => {
+    const number = String(question.number ?? index + 1);
+    const rubric = rubricQuestions[number] ?? {};
+    const criteria = Array.isArray(rubric.criteria)
+      ? rubric.criteria.map((item) => typeof item === "object" && item && "description" in item ? String(item.description) : String(item)).join("\n")
+      : "";
+    const mistakes = Array.isArray(rubric.common_mistakes) ? rubric.common_mistakes.map(String).join("\n") : "";
+    return {
+      number,
+      prompt: String(question.prompt ?? ""),
+      expectedAnswer: String(question.expected_answer ?? ""),
+      maxScore: String(question.max_score ?? 0),
+      criteria,
+      commonMistakes: mistakes,
+    };
+  });
+}
+
+function buildAssignmentPayload(questions: QuestionDraft[], generalRules: string) {
+  const cleanedQuestions = questions.map((question, index) => ({
+    ...question,
+    number: question.number.trim() || String(index + 1),
+    maxScore: question.maxScore || "0",
+  }));
+  return {
+    totalPoints: cleanedQuestions.reduce((sum, question) => sum + Number(question.maxScore || 0), 0),
+    answerKey: {
+      questions: cleanedQuestions.map((question) => ({
+        number: question.number,
+        prompt: question.prompt,
+        expected_answer: question.expectedAnswer,
+        max_score: Number(question.maxScore || 0),
+        acceptable_alternates: [],
+      })),
+    },
+    rubric: {
+      general_rules: generalRules.split("\n").map((rule) => rule.trim()).filter(Boolean),
+      questions: Object.fromEntries(
+        cleanedQuestions.map((question) => [
+          question.number,
+          {
+            criteria: question.criteria.split("\n").map((line) => line.trim()).filter(Boolean).map((description) => ({ description })),
+            common_mistakes: question.commonMistakes.split("\n").map((line) => line.trim()).filter(Boolean),
+          },
+        ])
+      ),
+    },
+  };
+}
 
 export default function AssignmentPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { notify } = useToast();
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [history, setHistory] = useState<AssignmentHistory | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [studentName, setStudentName] = useState("");
   const [error, setError] = useState("");
   const [gradingId, setGradingId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [savingAssignment, setSavingAssignment] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editRules, setEditRules] = useState("");
+  const [editQuestions, setEditQuestions] = useState<QuestionDraft[]>([]);
+  const [editChangeNote, setEditChangeNote] = useState("");
+  const [regrading, setRegrading] = useState(false);
 
   async function load() {
     try {
-      const [assignmentRow, submissionRows, stats] = await Promise.all([
+      const [assignmentRow, submissionRows, stats, historyRows] = await Promise.all([
         api<Assignment>(`/assignments/${id}`),
         api<Submission[]>(`/assignments/${id}/submissions`),
         api<Analytics>(`/analytics/assignments/${id}`),
+        api<AssignmentHistory>(`/assignments/${id}/history`),
       ]);
       setAssignment(assignmentRow);
+      setEditTitle(assignmentRow.title);
+      setEditDescription(assignmentRow.description ?? "");
+      setEditRules(Array.isArray(assignmentRow.rubric?.general_rules) ? (assignmentRow.rubric.general_rules as string[]).join("\n") : "");
+      setEditQuestions(questionsFromAssignment(assignmentRow));
       setSubmissions(submissionRows);
       setAnalytics(stats);
+      setHistory(historyRows);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load assignment");
+      const message = err instanceof Error ? err.message : "Could not load assignment";
+      setError(message);
+      notify(message, "error");
     }
   }
 
@@ -62,9 +151,12 @@ export default function AssignmentPage() {
       }
       setFiles([]);
       setStudentName("");
+      notify("Submission uploaded", "success");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      const message = err instanceof Error ? err.message : "Upload failed";
+      setError(message);
+      notify(message, "error");
     }
   }
 
@@ -78,9 +170,12 @@ export default function AssignmentPage() {
     setGradingId(submissionId);
     try {
       await api(`/submissions/${submissionId}/grade`, { method: "POST" });
+      notify("Submission graded", "success");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Grading failed");
+      const message = err instanceof Error ? err.message : "Grading failed";
+      setError(message);
+      notify(message, "error");
     } finally {
       setGradingId(null);
     }
@@ -91,9 +186,12 @@ export default function AssignmentPage() {
     setError("");
     try {
       await api<void>(`/assignments/${id}`, { method: "DELETE" });
+      notify("Assignment deleted", "success");
       router.push(`/classes/${assignment.class_id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete assignment");
+      const message = err instanceof Error ? err.message : "Could not delete assignment";
+      setError(message);
+      notify(message, "error");
     }
   }
 
@@ -102,9 +200,12 @@ export default function AssignmentPage() {
     setError("");
     try {
       await api<void>(`/submissions/${submissionId}`, { method: "DELETE" });
+      notify("Submission deleted", "success");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete submission");
+      const message = err instanceof Error ? err.message : "Could not delete submission";
+      setError(message);
+      notify(message, "error");
     }
   }
 
@@ -112,9 +213,42 @@ export default function AssignmentPage() {
     setError("");
     try {
       await api(`/assignments/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+      notify("Assignment status updated", "success");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update assignment status");
+      const message = err instanceof Error ? err.message : "Could not update assignment status";
+      setError(message);
+      notify(message, "error");
+    }
+  }
+
+  async function saveAssignment(event: FormEvent) {
+    event.preventDefault();
+    if (!assignment) return;
+    setError("");
+    setSavingAssignment(true);
+    try {
+      const built = buildAssignmentPayload(editQuestions, editRules);
+      await api(`/assignments/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          title: editTitle,
+          description: editDescription || null,
+          total_points: built.totalPoints,
+          answer_key: built.answerKey,
+          rubric: built.rubric,
+          change_note: editChangeNote || null,
+        }),
+      });
+      setEditChangeNote("");
+      notify("Assignment saved. Use regrade all to apply rubric changes to existing submissions.", "success");
+      await load();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not update assignment";
+      setError(message);
+      notify(message, "error");
+    } finally {
+      setSavingAssignment(false);
     }
   }
 
@@ -122,9 +256,12 @@ export default function AssignmentPage() {
     setError("");
     try {
       const copy = await api<Assignment>(`/assignments/${id}/duplicate`, { method: "POST" });
+      notify("Assignment duplicated", "success");
       router.push(`/assignments/${copy.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not duplicate assignment");
+      const message = err instanceof Error ? err.message : "Could not duplicate assignment";
+      setError(message);
+      notify(message, "error");
     }
   }
 
@@ -133,6 +270,61 @@ export default function AssignmentPage() {
     for (const submission of queue) {
       await grade(submission.id);
     }
+  }
+
+  async function bulkApprove() {
+    setError("");
+    try {
+      await api(`/assignments/${id}/bulk-approve`, { method: "POST" });
+      notify("Completed submissions approved", "success");
+      await load();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not approve completed work";
+      setError(message);
+      notify(message, "error");
+    }
+  }
+
+  async function returnResults() {
+    setError("");
+    try {
+      await api(`/assignments/${id}/return-results`, { method: "POST" });
+      notify("Results returned to student portals", "success");
+      await load();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not return results";
+      setError(message);
+      notify(message, "error");
+    }
+  }
+
+  async function regradeAll() {
+    if (!window.confirm("Regrade all submissions for this assignment using the current answer key and rubric?")) return;
+    setError("");
+    setRegrading(true);
+    try {
+      const result = await api<{ regraded: number; failed: number }>(`/assignments/${id}/regrade`, { method: "POST" });
+      notify(`Regraded ${result.regraded} submissions${result.failed ? `, ${result.failed} failed` : ""}`, result.failed ? "info" : "success");
+      await load();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not regrade submissions";
+      setError(message);
+      notify(message, "error");
+    } finally {
+      setRegrading(false);
+    }
+  }
+
+  function updateEditQuestion(index: number, changes: Partial<QuestionDraft>) {
+    setEditQuestions((current) => current.map((question, questionIndex) => questionIndex === index ? { ...question, ...changes } : question));
+  }
+
+  function addEditQuestion() {
+    setEditQuestions((current) => [...current, { number: String(current.length + 1), prompt: "", expectedAnswer: "", maxScore: "5", criteria: "", commonMistakes: "" }]);
+  }
+
+  function removeEditQuestion(index: number) {
+    setEditQuestions((current) => current.length === 1 ? current : current.filter((_, questionIndex) => questionIndex !== index));
   }
 
   function exportCsv() {
@@ -172,7 +364,7 @@ export default function AssignmentPage() {
             {assignment && (
               <>
                 <button className="app-btn app-btn-secondary" onClick={() => updateStatus("active")} type="button">Open grading</button>
-                <button className="app-btn app-btn-ghost" onClick={() => updateStatus("returned")} type="button">Mark returned</button>
+                <button className="app-btn app-btn-ghost" onClick={returnResults} type="button">Return results</button>
                 <button className="app-btn app-btn-ghost" onClick={duplicateAssignment} type="button">Duplicate</button>
                 <button className="app-btn app-btn-ghost" onClick={() => updateStatus("archived")} type="button">Archive</button>
               </>
@@ -207,6 +399,7 @@ export default function AssignmentPage() {
             </div>
             <div className="flex flex-wrap gap-3">
               <button className="app-btn app-btn-secondary" disabled={!ungradedCount || Boolean(gradingId)} onClick={gradeAllUngraded} type="button">Grade {ungradedCount || "all"} ungraded</button>
+              <button className="app-btn app-btn-primary" disabled={!submissions.length || Boolean(reviewCount)} onClick={bulkApprove} type="button">Approve completed</button>
               <button className="app-btn app-btn-ghost" disabled={!submissions.length} onClick={exportCsv} type="button">Export CSV</button>
             </div>
           </div>
@@ -246,7 +439,7 @@ export default function AssignmentPage() {
           )}
         </section>
 
-        <div className="mt-6 grid items-start gap-6 lg:grid-cols-[1fr_350px]">
+        <div className="mt-6 grid items-start gap-6 xl:grid-cols-[1fr_460px]">
           <section className={panelClass}>
             <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
               <div><h2 className="font-display text-2xl font-semibold">Submissions</h2><p className="mt-1 text-sm text-[#8496B0]">Open a submission for question-level feedback and teacher review.</p></div>
@@ -301,6 +494,82 @@ export default function AssignmentPage() {
           </section>
 
           <aside className="space-y-6">
+            <form className={panelClass} onSubmit={saveAssignment}>
+              <div className="mb-5">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">Assignment setup</div>
+                <h2 className="font-display text-xl font-semibold">Edit rubric and key</h2>
+                <p className="mt-1 text-xs leading-5 text-[#8496B0]">Save creates a version. Regrade existing submissions after rubric changes.</p>
+              </div>
+              <label className="block">
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Title</span>
+                <input className={inputClass} value={editTitle} onChange={(event) => setEditTitle(event.target.value)} required />
+              </label>
+              <label className="mt-4 block">
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Description</span>
+                <textarea className={textareaClass} value={editDescription} onChange={(event) => setEditDescription(event.target.value)} />
+              </label>
+              <label className="mt-4 block">
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">General grading rules</span>
+                <textarea className={textareaClass} value={editRules} onChange={(event) => setEditRules(event.target.value)} />
+              </label>
+              <div className="mt-5 rounded-xl border border-[#8496b01f] bg-[#0B1829] p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h3 className="font-display font-semibold">Questions</h3>
+                  <span className="font-mono text-xs text-[#8496B0]">{buildAssignmentPayload(editQuestions, editRules).totalPoints} points</span>
+                </div>
+                <div className="space-y-4">
+                  {editQuestions.map((question, index) => (
+                    <div className="rounded-xl border border-[#8496b01f] bg-[#132338] p-4" key={index}>
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <span className="font-display text-sm font-semibold">Question {index + 1}</span>
+                        <button className="app-btn app-btn-danger app-btn-sm" onClick={() => removeEditQuestion(index)} type="button">Remove</button>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-[80px_1fr_90px]">
+                        <input className={inputClass} value={question.number} onChange={(event) => updateEditQuestion(index, { number: event.target.value })} required />
+                        <input className={inputClass} value={question.prompt} onChange={(event) => updateEditQuestion(index, { prompt: event.target.value })} placeholder="Prompt" required />
+                        <input className={inputClass} min="0.5" step="0.5" type="number" value={question.maxScore} onChange={(event) => updateEditQuestion(index, { maxScore: event.target.value })} required />
+                      </div>
+                      <textarea className={`${textareaClass} mt-3`} value={question.expectedAnswer} onChange={(event) => updateEditQuestion(index, { expectedAnswer: event.target.value })} placeholder="Expected answer" required />
+                      <textarea className={`${textareaClass} mt-3`} value={question.criteria} onChange={(event) => updateEditQuestion(index, { criteria: event.target.value })} placeholder="Scoring criteria, one per line" />
+                      <textarea className={`${textareaClass} mt-3`} value={question.commonMistakes} onChange={(event) => updateEditQuestion(index, { commonMistakes: event.target.value })} placeholder="Common mistakes, one per line" />
+                    </div>
+                  ))}
+                </div>
+                <button className="app-btn app-btn-secondary app-btn-full mt-4" onClick={addEditQuestion} type="button">Add question</button>
+              </div>
+              <label className="mt-4 block">
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Change note</span>
+                <input className={inputClass} value={editChangeNote} onChange={(event) => setEditChangeNote(event.target.value)} placeholder="What changed in this version?" />
+              </label>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <button className="app-btn app-btn-secondary app-btn-full" disabled={savingAssignment} type="submit">{savingAssignment ? "Saving..." : "Save version"}</button>
+                <button className="app-btn app-btn-primary app-btn-full" disabled={regrading || !submissions.length} onClick={regradeAll} type="button">{regrading ? "Regrading..." : "Regrade all"}</button>
+              </div>
+            </form>
+
+            <div className={panelClass}>
+              <div className="mb-5">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">History</div>
+                <h2 className="font-display text-xl font-semibold">Versions and audit</h2>
+              </div>
+              <div className="space-y-3">
+                {history?.versions?.slice(0, 4).map((version) => (
+                  <div className="rounded-xl border border-[#8496b01f] bg-[#0B1829] p-4" key={version.id}>
+                    <div className="font-display text-sm font-semibold">Version {version.version_number}</div>
+                    <div className="mt-1 text-xs text-[#8496B0]">{new Date(version.created_at).toLocaleString()}</div>
+                    {version.change_note && <p className="mt-2 text-sm leading-6 text-[#E2EAF4]">{version.change_note}</p>}
+                  </div>
+                ))}
+                {history?.audit_logs?.slice(0, 5).map((log) => (
+                  <div className="rounded-xl border border-[#8496b01f] bg-[#0B1829] p-4" key={log.id}>
+                    <div className="font-display text-sm font-semibold">{log.action.replaceAll("_", " ")}</div>
+                    <div className="mt-1 text-xs text-[#8496B0]">{new Date(log.created_at).toLocaleString()}</div>
+                  </div>
+                ))}
+                {!history?.versions?.length && !history?.audit_logs?.length && <p className="text-sm text-[#8496B0]">No history yet.</p>}
+              </div>
+            </div>
+
             <form className={panelClass} onSubmit={upload}>
               <div className="mb-5"><div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">New submissions</div><h2 className="font-display text-xl font-semibold">Batch upload work</h2></div>
               <label className="block">

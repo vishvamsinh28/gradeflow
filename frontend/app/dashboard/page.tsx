@@ -4,8 +4,9 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
+import { useToast } from "@/components/ToastProvider";
 import { api } from "@/lib/api";
-import { Classroom, User } from "@/lib/types";
+import { Classroom, TeacherSettings, User } from "@/lib/types";
 
 const inputClass = "app-input w-full rounded-xl border border-[#8496b02e] bg-[#0B1829] px-4 py-3 text-sm text-[#F8FAFC]";
 const panelClass = "rounded-2xl border border-[#8496b01f] bg-[#132338] p-5 shadow-[0_18px_48px_rgba(0,0,0,.12)] sm:p-6";
@@ -23,30 +24,38 @@ type ReviewQueueItem = {
 
 export default function Dashboard() {
   const router = useRouter();
+  const { notify } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [classes, setClasses] = useState<Classroom[]>([]);
+  const [settings, setSettings] = useState<TeacherSettings | null>(null);
   const [name, setName] = useState("");
   const [grade, setGrade] = useState("");
-  const [subject, setSubject] = useState("Mathematics");
+  const [subject, setSubject] = useState("");
   const [reviewQueue, setReviewQueue] = useState<ReviewQueueItem[]>([]);
   const [error, setError] = useState("");
 
   async function load() {
     try {
-      const [me, classRows, reviewRows] = await Promise.all([
+      const [me, classRows, reviewRows, settingsRow] = await Promise.all([
         api<User>("/auth/me"),
         api<Classroom[]>("/classes"),
         api<ReviewQueueItem[]>("/submissions/review-queue"),
+        api<TeacherSettings>("/settings"),
       ]);
       setUser(me);
       setClasses(classRows);
       setReviewQueue(reviewRows);
+      setSettings(settingsRow);
+      setSubject((current) => current || settingsRow.default_subject);
+      setGrade((current) => current || settingsRow.default_grade_level || "");
     } catch (err) {
       if (err instanceof Error && "status" in err && err.status === 401) {
         router.replace("/");
         return;
       }
-      setError(err instanceof Error ? err.message : "Could not load dashboard");
+      const message = err instanceof Error ? err.message : "Could not load dashboard";
+      setError(message);
+      notify(message, "error");
     }
   }
 
@@ -63,11 +72,14 @@ export default function Dashboard() {
         body: JSON.stringify({ name, grade_level: grade || null, subject }),
       });
       setName("");
-      setGrade("");
-      setSubject("Mathematics");
+      setGrade(settings?.default_grade_level || "");
+      setSubject(settings?.default_subject || "Mathematics");
+      notify("Class created", "success");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create class");
+      const message = err instanceof Error ? err.message : "Could not create class";
+      setError(message);
+      notify(message, "error");
     }
   }
 
@@ -76,9 +88,12 @@ export default function Dashboard() {
     setError("");
     try {
       await api<void>(`/classes/${classId}`, { method: "DELETE" });
+      notify("Class deleted", "success");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete class");
+      const message = err instanceof Error ? err.message : "Could not delete class";
+      setError(message);
+      notify(message, "error");
     }
   }
 
@@ -110,7 +125,10 @@ export default function Dashboard() {
               <h2 className="font-display text-2xl font-semibold">Submissions needing your eyes</h2>
               <p className="mt-1 text-sm text-[#8496B0]">Low-confidence grades across every class, ordered by most recent activity.</p>
             </div>
-            <span className="w-fit rounded-full border border-[#f59e0b40] bg-[#f59e0b14] px-3 py-1.5 font-mono text-xs text-[#F59E0B]">{reviewQueue.length} pending</span>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="w-fit rounded-full border border-[#f59e0b40] bg-[#f59e0b14] px-3 py-1.5 font-mono text-xs text-[#F59E0B]">{reviewQueue.length} pending</span>
+              <Link className="app-btn app-btn-secondary app-btn-sm" href="/review">Open queue</Link>
+            </div>
           </div>
           {reviewQueue.length ? (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">

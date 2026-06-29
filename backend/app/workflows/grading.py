@@ -28,7 +28,6 @@ class GradingWorkflow:
     def __init__(self, db: Client):
         self.db = db
         self.storage = SubmissionStorage(db)
-        self.gemini = GeminiGrader()
         self.settings = get_settings()
         self.graph = self._build_graph()
 
@@ -80,25 +79,39 @@ class GradingWorkflow:
         submission = submission_response.data[0]
         assignment_response = (
             self.db.table("assignments")
-            .select("*")
+            .select("*,classes(owner_id)")
             .eq("id", submission["assignment_id"])
             .limit(1)
             .execute()
         )
         if not assignment_response.data:
             raise ValueError("Assignment not found")
-        return {"submission": submission, "assignment": assignment_response.data[0]}
+        assignment = assignment_response.data[0]
+        owner_id = assignment.get("classes", {}).get("owner_id")
+        teacher_settings = None
+        if owner_id:
+            settings_response = (
+                self.db.table("teacher_settings")
+                .select("*")
+                .eq("user_id", owner_id)
+                .limit(1)
+                .execute()
+            )
+            teacher_settings = settings_response.data[0] if settings_response.data else None
+        return {"submission": submission, "assignment": assignment, "teacher_settings": teacher_settings}
 
     def extract_work(self, state: GradingState) -> dict[str, Any]:
         submission = state["submission"]
         file_bytes = self.storage.download(submission["storage_path"])
-        extracted = self.gemini.extract_work(file_bytes, submission["mime_type"])
+        model = (state.get("teacher_settings") or {}).get("gemini_model")
+        extracted = GeminiGrader(model=model).extract_work(file_bytes, submission["mime_type"])
         return {"extracted": extracted.model_dump()}
 
     def grade_work(self, state: GradingState) -> dict[str, Any]:
         assignment = state["assignment"]
         extracted = ExtractionResult.model_validate(state["extracted"])
-        grading = self.gemini.grade_work(
+        model = (state.get("teacher_settings") or {}).get("gemini_model")
+        grading = GeminiGrader(model=model).grade_work(
             extracted=extracted,
             answer_key=assignment["answer_key"],
             rubric=assignment["rubric"],
@@ -113,9 +126,10 @@ class GradingWorkflow:
         if question_confidences:
             confidence = min(confidence, sum(question_confidences) / len(question_confidences))
         confidence = round(max(0, min(confidence, 1)), 3)
+        threshold = float((state.get("teacher_settings") or {}).get("confidence_threshold") or self.settings.grading_confidence_threshold)
         return {
             "confidence": confidence,
-            "review_required": confidence < self.settings.grading_confidence_threshold,
+            "review_required": confidence < threshold,
         }
 
     def route_by_confidence(self, state: GradingState) -> Literal["review", "complete"]:

@@ -10,11 +10,17 @@ type AuthMode = "login" | "register";
 const primaryButton = "app-btn app-btn-primary app-btn-lg";
 const ghostButton = "app-btn app-btn-ghost app-btn-lg";
 
+const gradeRows = [
+  { name: "Anika Patel", score: "9.5", grade: "A", tone: "grade-a", note: "Strong process", confidence: "96%" },
+  { name: "Marcus Tan", score: "6.0", grade: "C", tone: "grade-c", note: "Review flagged", confidence: "61%" },
+  { name: "Priya Nair", score: "10", grade: "A", tone: "grade-a", note: "Ready to return", confidence: "99%" },
+  { name: "Owen Brooks", score: "7.5", grade: "B", tone: "grade-b", note: "Partial credit", confidence: "88%" },
+];
+
 export default function Home() {
   const router = useRouter();
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("register");
-  const [barsVisible, setBarsVisible] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -30,11 +36,6 @@ export default function Home() {
     };
   }, [router]);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => setBarsVisible(true), 450);
-    return () => window.clearTimeout(timer);
-  }, []);
-
   const closeAuth = useCallback(() => setAuthOpen(false), []);
 
   function openAuth(mode: AuthMode) {
@@ -43,167 +44,148 @@ export default function Home() {
   }
 
   return (
-    <main className="bg-[#0B1829] text-[#F8FAFC]">
-      <nav className="fixed inset-x-0 top-0 z-[100] flex h-[60px] items-center justify-between border-b border-[#8496b026] bg-[#0b1829d9] px-[6vw] backdrop-blur-xl">
-        <a href="#top" className="font-display text-xl font-bold tracking-[-0.5px]">
-          Grade<span className="text-[#00C9A7]">Flow</span>
-        </a>
-        <ul className="hidden list-none items-center gap-7 md:flex">
-          <li><a className="text-sm text-[#8496B0] transition hover:text-[#F8FAFC]" href="#how">How it works</a></li>
-          <li><a className="text-sm text-[#8496B0] transition hover:text-[#F8FAFC]" href="#features">Features</a></li>
-          <li><a className="text-sm text-[#8496B0] transition hover:text-[#F8FAFC]" href="#testimonials">Reviews</a></li>
-          <li><button className="text-sm text-[#8496B0] transition hover:text-[#F8FAFC]" onClick={() => openAuth("login")}>Sign in</button></li>
-        </ul>
-        <button
-          onClick={() => openAuth("register")}
-          className="app-btn app-btn-primary"
-        >
-          Start free trial
-        </button>
+    <main className="gradeflow-landing min-h-screen bg-[#091421] text-[#F8FAFC]">
+      <nav className="fixed inset-x-0 top-0 z-[100] border-b border-white/10 bg-[#091421d9] backdrop-blur-xl">
+        <div className="mx-auto flex h-16 w-[min(1200px,92vw)] items-center justify-between gap-4">
+          <a href="#top" className="font-display text-xl font-bold tracking-[-0.5px]">
+            Grade<span className="text-[#00C9A7]">Flow</span>
+          </a>
+          <ul className="hidden list-none items-center gap-7 md:flex">
+            <li><a className="text-sm text-[#A8B7C9] transition hover:text-white" href="#workflow">Workflow</a></li>
+            <li><a className="text-sm text-[#A8B7C9] transition hover:text-white" href="#features">Features</a></li>
+            <li><a className="text-sm text-[#A8B7C9] transition hover:text-white" href="#proof">Product</a></li>
+            <li><button className="text-sm text-[#A8B7C9] transition hover:text-white" onClick={() => openAuth("login")}>Sign in</button></li>
+          </ul>
+          <button onClick={() => openAuth("register")} className="app-btn app-btn-primary">
+            Start grading
+          </button>
+        </div>
       </nav>
 
-      <section id="top" className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-[6vw] pb-[60px] pt-[100px] text-center">
-        <div className="hero-glow pointer-events-none absolute inset-0" />
-        <div className="relative z-10 flex flex-col items-center">
-          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-[#00c9a740] bg-[#00c9a71a] px-3.5 py-1 text-[13px] font-medium tracking-[0.02em] text-[#00C9A7]">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#00C9A7]" />
-            AI-powered grading workspace
+      <section id="top" className="relative isolate flex min-h-[92svh] items-center overflow-hidden px-[4vw] pb-16 pt-28">
+        <ProductBackdrop />
+        <div className="relative z-10 mx-auto grid w-[min(1200px,92vw)] items-end gap-10 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="landing-reveal pb-6">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#00c9a740] bg-[#00c9a710] px-3.5 py-1 text-[13px] font-semibold text-[#72F1DA]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#72F1DA] shadow-[0_0_18px_rgba(114,241,218,.9)]" />
+              AI grading, review, and result release in one workspace
+            </div>
+            <h1 className="font-display text-[clamp(58px,9vw,120px)] font-bold leading-[0.88] tracking-[-4px] text-white">
+              GradeFlow
+            </h1>
+            <p className="mt-7 max-w-[620px] text-[clamp(18px,2vw,22px)] leading-[1.55] text-[#C5D1DF]">
+              Turn worksheet piles into scored submissions, review queues, class insights, returned student results, and an auditable grading history.
+            </p>
+            <div className="mt-9 flex flex-wrap gap-3.5">
+              <button className={primaryButton} onClick={() => openAuth("register")}>Create workspace</button>
+              <a className={ghostButton} href="#workflow">See workflow</a>
+            </div>
+            <div className="mt-9 grid max-w-[620px] grid-cols-3 gap-3">
+              <HeroMetric value="47s" label="demo batch" />
+              <HeroMetric value="3" label="review flags" tone="amber" />
+              <HeroMetric value="7d" label="secure session" tone="violet" />
+            </div>
           </div>
-          <h1 className="max-w-[900px] font-display text-[clamp(40px,6vw,72px)] font-bold leading-[1.1] tracking-[-2px] text-[#F8FAFC]">
-            Grade 30 worksheets<br />in the time it takes<br />to grade <em className="not-italic text-[#00C9A7]">three</em>
-          </h1>
-          <p className="mx-auto mt-6 max-w-[580px] text-[clamp(16px,2vw,19px)] leading-[1.65] text-[#8496B0]">
-            Upload any worksheet image or PDF. GradeFlow extracts student work, scores it against your answer key and rubric, and flags the ones that need your eye.
-          </p>
-          <div className="mt-10 flex flex-wrap justify-center gap-3.5">
-            <button className={primaryButton} onClick={() => openAuth("register")}>Try GradeFlow free</button>
-            <a className={ghostButton} href="#how">See how it works</a>
-          </div>
-        </div>
 
-        <div className="relative z-10 mx-auto mt-[60px] w-full max-w-[780px]">
-          <div className="rounded-2xl border border-[#8496b026] bg-[#132338] p-4 text-left sm:p-6">
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-              <span className="font-display text-sm font-semibold text-[#E2EAF4]">Period 3 — Fractions Unit Test · 28 students</span>
-              <span className="text-xs text-[#8496B0]">Graded in 47 sec · 3 flagged for review</span>
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <StudentPreview
-                name="Anika P."
-                problem={<>3/4 + 1/3 = 13/12 ✓<br />LCD = 12, correct</>}
-                score="8"
-                scoreTone="text-[#4ADE80]"
-                confidence="94%"
-                confidenceTone="bg-[#00C9A7]"
-                tag="Strong process"
-                barsVisible={barsVisible}
-              />
-              <StudentPreview
-                name="Marcus T."
-                problem={<>2/5 + 3/5 = 5/10 ?<br />Numerators added ✗</>}
-                score="3"
-                scoreTone="text-[#F87171]"
-                confidence="61%"
-                confidenceTone="bg-[#F59E0B]"
-                tag="Needs attention"
-                flagged
-                barsVisible={barsVisible}
-              />
-              <StudentPreview
-                name="Priya N."
-                problem={<>5/6 − 1/4 = 7/12 ✓<br />LCD = 12, correct</>}
-                score="10"
-                scoreTone="text-[#4ADE80]"
-                confidence="99%"
-                confidenceTone="bg-[#00C9A7]"
-                tag="Full marks"
-                barsVisible={barsVisible}
-              />
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <DemoStat value="82%" label="Class avg" tone="text-[#00C9A7]" />
-              <DemoStat value="25" label="Auto-graded" />
-              <DemoStat value="3" label="Needs review" tone="text-[#F59E0B]" />
-              <DemoStat value="47s" label="Total time" />
-            </div>
+          <div className="landing-product-shell">
+            <ProductWorkspace />
           </div>
         </div>
       </section>
 
-      <section id="how" className="bg-[#132338] px-[6vw] py-24">
-        <SectionHeading eyebrow="How it works" title={<>From stack of papers<br />to graded class — fast</>} />
-        <div className="mt-14 grid overflow-hidden rounded-2xl border border-[#8496b01a] bg-[#8496b01a] sm:grid-cols-2 xl:grid-cols-4">
-          <Step number="01" icon="📤" title="Upload worksheets">Drag in a batch of scanned images or PDFs. GradeFlow handles handwriting, photos, and multi-page documents.</Step>
-          <Step number="02" icon="🗝️" title="Set your answer key">Type in your answer key and rubric once. Award partial credit, define acceptable methods, or weight questions differently.</Step>
-          <Step number="03" icon="⚡" title="AI extracts and scores">Every student&apos;s work is pulled out, matched against your rubric, and assigned a score with a confidence rating.</Step>
-          <Step number="04" icon="🚩" title="Review flagged papers">Low-confidence grades surface for your eyes only. Approve, adjust, or override with one click — never lose control.</Step>
+      <section id="workflow" className="border-y border-white/10 bg-[#101C2C] px-[4vw] py-24">
+        <div className="mx-auto w-[min(1200px,92vw)]">
+          <SectionHeading eyebrow="Workflow" title="From upload to returned results" text="GradeFlow now supports the full teacher loop: create, grade, review, edit rubrics, regrade, return, and audit." />
+          <div className="mt-12 grid gap-3 lg:grid-cols-5">
+            <WorkflowStep number="01" title="Build the rubric" text="Create question-level answer keys and grading rules without raw JSON." />
+            <WorkflowStep number="02" title="Batch upload" text="Upload images or PDFs and assign by student name as you go." />
+            <WorkflowStep number="03" title="Review exceptions" text="Low-confidence work lands in a dedicated teacher review queue." />
+            <WorkflowStep number="04" title="Regrade safely" text="Version rubric edits, regrade all submissions, and keep an audit trail." />
+            <WorkflowStep number="05" title="Return results" text="Release completed grades to each student's secure results link." />
+          </div>
         </div>
       </section>
 
-      <section id="features" className="px-[6vw] py-24">
-        <SectionHeading eyebrow="Features" title={<>Everything a grading<br />workflow needs</>} />
-        <div className="mt-14 grid gap-6 md:grid-cols-2">
-          <Feature icon="🧠" title="Handwriting recognition" accent>
-            Reads messy student handwriting, crossed-out answers, and margin work across classroom subjects — not just typed text.
-          </Feature>
-          <Feature icon="📐" title="Flexible rubrics" iconTone="amber">
-            Full credit, partial credit, method-based scoring. Copy a rubric across assignments or tweak each question in seconds.
-          </Feature>
-          <Feature icon="💬" title="Per-student feedback">
-            Auto-generated feedback based on each student&apos;s specific errors — ready to paste into your LMS or print.
-          </Feature>
-          <Feature icon="🚩" title="Confidence flagging" iconTone="amber" accent>
-            Every score has a confidence rating. Anything below your threshold lands in a review queue — you decide the bar.
-          </Feature>
-          <div className="rounded-[14px] border border-[#8496b01f] bg-[#132338] p-7 md:col-span-2">
-            <div className="grid items-center gap-8 md:grid-cols-2">
+      <section id="features" className="px-[4vw] py-24">
+        <div className="mx-auto w-[min(1200px,92vw)]">
+          <SectionHeading eyebrow="Product features" title="Built like an actual grading system" text="The app now has the operational pieces teachers expect before trusting AI with classroom work." />
+          <div className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            <FeatureCard title="Teacher settings" stat="Model + defaults" tone="cyan">
+              Configure the Gemini model, confidence threshold, default subject, grade level, and grading rules from one settings page.
+            </FeatureCard>
+            <FeatureCard title="Review center" stat="Cross-class queue" tone="amber">
+              See every low-confidence submission across classes, approve obvious cases, or open deep evidence review.
+            </FeatureCard>
+            <FeatureCard title="Rubric versions" stat="Change history" tone="violet">
+              Every assignment edit can create a saved version with a change note and audit event.
+            </FeatureCard>
+            <FeatureCard title="Regrade all" stat="After edits" tone="blue">
+              Apply a revised answer key or rubric to existing submissions without manually opening each student.
+            </FeatureCard>
+            <FeatureCard title="Student results portal" stat="Returned only" tone="green">
+              Copy a per-student results link. Students only see assignments the teacher has marked returned.
+            </FeatureCard>
+            <FeatureCard title="Audit logging" stat="Traceable actions" tone="red">
+              Track settings changes, grading runs, approvals, overrides, deletes, returns, and regrades.
+            </FeatureCard>
+          </div>
+        </div>
+      </section>
+
+      <section id="proof" className="bg-[#101C2C] px-[4vw] py-24">
+        <div className="mx-auto grid w-[min(1200px,92vw)] items-center gap-10 lg:grid-cols-[0.9fr_1.1fr]">
+          <div>
+            <SectionHeading eyebrow="Grade intelligence" title="Linear grade colors for fast scanning" text="Scores read like a real gradebook: strong work, borderline answers, review flags, and released results are visually distinct without hiding the detail." />
+            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+              <GradeLegend label="A range" color="grade-a" />
+              <GradeLegend label="B range" color="grade-b" />
+              <GradeLegend label="C range" color="grade-c" />
+              <GradeLegend label="Needs review" color="grade-r" />
+            </div>
+          </div>
+          <div className="landing-panel p-4 sm:p-5">
+            <div className="mb-4 flex items-center justify-between">
               <div>
-                <div className="mb-4 grid h-10 w-10 place-items-center rounded-[10px] bg-[#00c9a71a] text-lg">📊</div>
-                <h3 className="font-display text-lg font-semibold">Class-level analytics</h3>
-                <p className="mt-2 text-sm leading-[1.65] text-[#8496B0]">
-                  See which questions tripped up the most students, track score distributions, and spot learning gaps before they compound.
-                </p>
+                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[#72F1DA]">Returned packet</div>
+                <h3 className="font-display text-2xl font-semibold">Fractions Unit Test</h3>
               </div>
-              <div>
-                <AnalyticsBar label="Question 1" width="92%" value="92%" />
-                <AnalyticsBar label="Question 2" width="78%" value="78%" />
-                <AnalyticsBar label="Question 3" width="43%" value="43%" warning />
-                <AnalyticsBar label="Question 4" width="89%" value="89%" />
-                <AnalyticsBar label="Question 5" width="61%" value="61%" />
-              </div>
+              <span className="rounded-full border border-[#00c9a740] bg-[#00c9a712] px-3 py-1 text-xs text-[#72F1DA]">Returned</span>
+            </div>
+            <div className="space-y-3">
+              {gradeRows.map((row) => (
+                <div className="grid grid-cols-[1fr_auto] gap-3 rounded-xl border border-white/10 bg-[#091421] p-4" key={row.name}>
+                  <div>
+                    <div className="font-display font-semibold">{row.name}</div>
+                    <div className="mt-1 text-xs text-[#A8B7C9]">{row.note} · {row.confidence} confidence</div>
+                  </div>
+                  <div className={`grade-chip ${row.tone}`}>
+                    <span>{row.grade}</span>
+                    <strong>{row.score}/10</strong>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      <section id="testimonials" className="bg-[#132338] px-[6vw] py-24">
-        <SectionHeading eyebrow="Teacher reviews" title={<>Loved by teachers who<br />have better things to do</>} />
-        <div className="mt-[52px] grid gap-5 md:grid-cols-3">
-          <Quote initials="SR" name="Sarah R." role="Grade 6 Math · Chicago">
-            I used to spend Sunday evenings grading. Now I upload the batch on Friday afternoon and it&apos;s done before I leave school.
-          </Quote>
-          <Quote initials="DK" name="David K." role="High School Algebra · Austin">
-            The flagging system is what sold me. I still see every paper that needs judgment — I just don&apos;t wade through the obvious ones.
-          </Quote>
-          <Quote initials="ML" name="Maya L." role="Middle School Science · Seattle">
-            Question-level analytics showed me that most of my class missed the same concept. I retaught it Monday and scores jumped.
-          </Quote>
+      <section id="cta" className="px-[4vw] py-24 text-center">
+        <div className="mx-auto max-w-[760px]">
+          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[#72F1DA]">Ready for a real workflow</div>
+          <h2 className="mt-4 font-display text-[clamp(34px,5vw,64px)] font-bold leading-[1.02] tracking-[-2px]">Grade, review, return, and improve from one place.</h2>
+          <p className="mx-auto mt-5 max-w-[560px] text-lg leading-8 text-[#A8B7C9]">Create a class, add a rubric, upload work, and let GradeFlow route the parts that need judgment.</p>
+          <div className="mt-9 flex flex-wrap justify-center gap-3.5">
+            <button className={primaryButton} onClick={() => openAuth("register")}>Start now</button>
+            <button className={ghostButton} onClick={() => openAuth("login")}>Sign in</button>
+          </div>
         </div>
       </section>
 
-      <section id="cta" className="px-[6vw] pb-[120px] pt-24 text-center">
-        <div className="text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">Get started</div>
-        <h2 className="mx-auto mt-3.5 max-w-[640px] font-display text-[clamp(28px,4vw,46px)] font-bold leading-[1.15] tracking-[-1px]">Start grading smarter this week</h2>
-        <p className="mx-auto mt-5 max-w-[500px] text-[17px] text-[#8496B0]">Create your workspace, add a class, and import your first student submission in minutes.</p>
-        <div className="mt-10 flex flex-wrap justify-center gap-3.5">
-          <button className={primaryButton} onClick={() => openAuth("register")}>Create a free account</button>
-          <a className={ghostButton} href="#top">Watch the demo</a>
+      <footer className="border-t border-white/10 px-[4vw] py-8">
+        <div className="mx-auto flex w-[min(1200px,92vw)] flex-wrap items-center justify-between gap-3 text-sm text-[#A8B7C9]">
+          <div className="font-display text-base font-bold">Grade<span className="text-[#00C9A7]">Flow</span></div>
+          <div>AI grading workspace with review, audit, and returned results.</div>
         </div>
-      </section>
-
-      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[#8496b01f] px-[6vw] py-7">
-        <div className="font-display text-base font-bold text-[#8496B0]">Grade<span className="text-[#00C9A7]">Flow</span></div>
-        <div className="text-[13px] text-[#8496b080]">Built for teachers, not admins.</div>
       </footer>
 
       <AuthModal open={authOpen} initialMode={authMode} onClose={closeAuth} />
@@ -211,61 +193,140 @@ export default function Home() {
   );
 }
 
-function StudentPreview({
-  name,
-  problem,
-  score,
-  scoreTone,
-  confidence,
-  confidenceTone,
-  tag,
-  flagged = false,
-  barsVisible,
-}: {
-  name: string;
-  problem: React.ReactNode;
-  score: string;
-  scoreTone: string;
-  confidence: string;
-  confidenceTone: string;
-  tag: string;
-  flagged?: boolean;
-  barsVisible: boolean;
-}) {
+function ProductBackdrop() {
   return (
-    <article className={`relative rounded-[10px] border p-3.5 ${flagged ? "border-[#f59e0b66] bg-[#f59e0b0a]" : "border-[#8496b01f] bg-[#1E344F]"}`}>
-      {flagged && <span className="absolute right-2.5 top-2.5 rounded border border-[#f59e0b40] bg-[#f59e0b1a] px-1.5 py-0.5 text-[10px] text-[#F59E0B]">⚑ Review</span>}
-      <div className="mb-1.5 text-xs text-[#8496B0]">{name}</div>
-      <div className="mb-2.5 font-mono text-[11px] leading-6 text-[#f8fafc80]">{problem}</div>
-      <div className="flex items-center gap-2"><span className={`font-mono text-xl font-medium ${scoreTone}`}>{score}</span><span className="text-xs text-[#8496B0]">/ 10</span></div>
-      <div className="mt-2 h-[3px] overflow-hidden rounded-sm bg-[#8496b026]">
-        <div className={`confidence-fill h-full rounded-sm ${confidenceTone}`} style={{ width: barsVisible ? confidence : 0 }} />
+    <div aria-hidden="true" className="absolute inset-0 overflow-hidden">
+      <div className="landing-grid absolute inset-0 opacity-70" />
+      <div className="absolute left-[-10%] top-[18%] h-[44rem] w-[44rem] rounded-full bg-[#00C9A7]/10 blur-3xl" />
+      <div className="absolute right-[-8%] top-[8%] h-[34rem] w-[34rem] rounded-full bg-[#7C5CFF]/12 blur-3xl" />
+      <div className="absolute bottom-[-18%] left-[32%] h-[30rem] w-[30rem] rounded-full bg-[#F59E0B]/10 blur-3xl" />
+    </div>
+  );
+}
+
+function ProductWorkspace() {
+  return (
+    <div className="landing-panel landing-float p-4 sm:p-5">
+      <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-4">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[#72F1DA]">Assignment workspace</div>
+          <div className="font-display text-xl font-semibold">Period 3 · Fractions Unit</div>
+        </div>
+        <div className="flex gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-[#4ADE80]" />
+          <span className="h-2.5 w-2.5 rounded-full bg-[#F59E0B]" />
+          <span className="h-2.5 w-2.5 rounded-full bg-[#F87171]" />
+        </div>
       </div>
-      <span className={`mt-2 inline-block rounded border px-2 py-0.5 text-[10px] ${flagged ? "border-[#f59e0b40] bg-[#f59e0b1a] text-[#F59E0B]" : "border-[#00c9a733] bg-[#00c9a71a] text-[#00C9A7]"}`}>{tag}</span>
+      <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="space-y-3">
+          {gradeRows.map((row, index) => (
+            <div className="landing-row" style={{ animationDelay: `${index * 120}ms` }} key={row.name}>
+              <div className={`grade-line ${row.tone}`} />
+              <div className="min-w-0">
+                <div className="truncate font-display text-sm font-semibold">{row.name}</div>
+                <div className="mt-1 text-xs text-[#A8B7C9]">{row.note}</div>
+              </div>
+              <div className={`grade-chip ${row.tone}`}>
+                <span>{row.grade}</span>
+                <strong>{row.score}</strong>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="space-y-3">
+          <MiniPanel title="Review queue" value="3" text="Flagged for teacher judgment" tone="amber" />
+          <MiniPanel title="Rubric version" value="v4" text="Updated partial-credit rule" tone="violet" />
+          <MiniPanel title="Returned links" value="28" text="Student portals ready" tone="green" />
+        </div>
+      </div>
+      <div className="mt-4 rounded-xl border border-white/10 bg-[#101C2C] p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#A8B7C9]">Question insights</span>
+          <span className="text-xs text-[#F59E0B]">common error detected</span>
+        </div>
+        <div className="space-y-2">
+          <InsightBar label="LCD setup" width="86%" tone="green" />
+          <InsightBar label="Numerator addition" width="44%" tone="amber" />
+          <InsightBar label="Simplification" width="72%" tone="blue" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HeroMetric({ value, label, tone = "green" }: { value: string; label: string; tone?: "green" | "amber" | "violet" }) {
+  return (
+    <div className={`landing-metric metric-${tone}`}>
+      <div className="font-mono text-2xl">{value}</div>
+      <div className="mt-1 text-[11px] uppercase tracking-[0.08em] text-[#A8B7C9]">{label}</div>
+    </div>
+  );
+}
+
+function MiniPanel({ title, value, text, tone }: { title: string; value: string; text: string; tone: "amber" | "violet" | "green" }) {
+  return (
+    <div className={`mini-panel mini-${tone}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-xs text-[#A8B7C9]">{title}</div>
+          <p className="mt-1 text-xs leading-5 text-[#DCE7F4]">{text}</p>
+        </div>
+        <div className="font-mono text-2xl">{value}</div>
+      </div>
+    </div>
+  );
+}
+
+function InsightBar({ label, width, tone }: { label: string; width: string; tone: "green" | "amber" | "blue" }) {
+  return (
+    <div className="grid grid-cols-[120px_1fr] items-center gap-3">
+      <span className="text-xs text-[#A8B7C9]">{label}</span>
+      <div className="h-2 overflow-hidden rounded-full bg-white/10">
+        <div className={`h-full rounded-full insight-${tone}`} style={{ width }} />
+      </div>
+    </div>
+  );
+}
+
+function SectionHeading({ eyebrow, title, text }: { eyebrow: string; title: string; text: string }) {
+  return (
+    <div>
+      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[#72F1DA]">{eyebrow}</div>
+      <h2 className="mt-3 max-w-[760px] font-display text-[clamp(34px,5vw,62px)] font-bold leading-[1.02] tracking-[-2px]">{title}</h2>
+      <p className="mt-5 max-w-[680px] text-lg leading-8 text-[#A8B7C9]">{text}</p>
+    </div>
+  );
+}
+
+function WorkflowStep({ number, title, text }: { number: string; title: string; text: string }) {
+  return (
+    <article className="workflow-step">
+      <div className="font-mono text-xs text-[#72F1DA]">{number}</div>
+      <h3 className="mt-6 font-display text-lg font-semibold">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-[#A8B7C9]">{text}</p>
     </article>
   );
 }
 
-function DemoStat({ value, label, tone = "text-[#F8FAFC]" }: { value: string; label: string; tone?: string }) {
-  return <div className="rounded-lg border border-[#8496b01a] bg-[#1E344F] px-3.5 py-3 text-center"><div className={`font-mono text-[22px] font-medium ${tone}`}>{value}</div><div className="mt-0.5 text-[11px] text-[#8496B0]">{label}</div></div>;
+function FeatureCard({ title, stat, tone, children }: { title: string; stat: string; tone: "cyan" | "amber" | "violet" | "blue" | "green" | "red"; children: React.ReactNode }) {
+  return (
+    <article className={`feature-card feature-${tone}`}>
+      <div className="mb-7 flex items-center justify-between gap-4">
+        <div className="feature-mark" />
+        <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-[#C5D1DF]">{stat}</span>
+      </div>
+      <h3 className="font-display text-xl font-semibold">{title}</h3>
+      <p className="mt-3 text-sm leading-7 text-[#A8B7C9]">{children}</p>
+    </article>
+  );
 }
 
-function SectionHeading({ eyebrow, title }: { eyebrow: string; title: React.ReactNode }) {
-  return <><div className="mb-3.5 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">{eyebrow}</div><h2 className="font-display text-[clamp(28px,4vw,46px)] font-bold leading-[1.15] tracking-[-1px]">{title}</h2></>;
-}
-
-function Step({ number, icon, title, children }: { number: string; icon: string; title: string; children: React.ReactNode }) {
-  return <article className="bg-[#132338] p-7 xl:p-8"><div className="mb-4 font-mono text-[11px] font-medium tracking-[0.05em] text-[#00C9A7]">{number}</div><div className="mb-4 grid h-11 w-11 place-items-center rounded-[10px] border border-[#00c9a733] bg-[#00c9a714] text-xl">{icon}</div><h3 className="font-display text-base font-semibold">{title}</h3><p className="mt-2 text-sm leading-[1.6] text-[#8496B0]">{children}</p></article>;
-}
-
-function Feature({ icon, title, children, accent = false, iconTone = "teal" }: { icon: string; title: string; children: React.ReactNode; accent?: boolean; iconTone?: "teal" | "amber" }) {
-  return <article className={`rounded-[14px] border p-7 ${accent ? "border-[#00c9a740] bg-[#00c9a70a]" : "border-[#8496b01f] bg-[#132338]"}`}><div className={`mb-4 grid h-10 w-10 place-items-center rounded-[10px] text-lg ${iconTone === "amber" ? "bg-[#f59e0b1a]" : "bg-[#00c9a71a]"}`}>{icon}</div><h3 className="font-display text-lg font-semibold">{title}</h3><p className="mt-2 text-sm leading-[1.65] text-[#8496B0]">{children}</p></article>;
-}
-
-function AnalyticsBar({ label, width, value, warning = false }: { label: string; width: string; value: string; warning?: boolean }) {
-  return <div className="mb-2.5 flex items-center gap-2.5"><span className="w-20 shrink-0 text-xs text-[#8496B0]">{label}</span><div className="h-2 flex-1 overflow-hidden rounded bg-[#8496b01f]"><div className={`h-full rounded ${warning ? "bg-[#F59E0B]" : "bg-[#00C9A7]"}`} style={{ width }} /></div><span className={`w-9 text-right font-mono text-[11px] ${warning ? "text-[#F59E0B]" : "text-[#8496B0]"}`}>{value}</span></div>;
-}
-
-function Quote({ initials, name, role, children }: { initials: string; name: string; role: string; children: React.ReactNode }) {
-  return <article className="rounded-[14px] border border-[#8496b01f] bg-[#1E344F] p-7"><p className="text-[15px] leading-[1.7] text-[#E2EAF4]"><span className="mr-1 align-[-12px] text-4xl leading-none text-[#00C9A7]">“</span>{children}</p><div className="mt-5 flex items-center gap-2.5"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#00c9a726] font-display text-[13px] font-semibold text-[#00C9A7]">{initials}</div><div><div className="text-sm font-medium">{name}</div><div className="text-xs text-[#8496B0]">{role}</div></div></div></article>;
+function GradeLegend({ label, color }: { label: string; color: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-[#091421] p-4">
+      <div className={`mb-3 h-2 rounded-full grade-gradient ${color}`} />
+      <div className="font-display font-semibold">{label}</div>
+    </div>
+  );
 }

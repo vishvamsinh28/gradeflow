@@ -9,13 +9,14 @@ from app.models.schemas import ExtractionResult, GradingResult
 
 
 class GeminiGrader:
-    def __init__(self) -> None:
+    def __init__(self, model: str | None = None) -> None:
         self.settings = get_settings()
+        self.model = model or self.settings.gemini_model
         self.client = genai.Client(api_key=self.settings.gemini_api_key)
 
     def _json_response(self, contents: list[Any]) -> dict[str, Any]:
         response = self.client.models.generate_content(
-            model=self.settings.gemini_model,
+            model=self.model,
             contents=contents,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",

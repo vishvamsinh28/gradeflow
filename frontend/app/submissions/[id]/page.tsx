@@ -4,7 +4,8 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
-import { api } from "@/lib/api";
+import { useToast } from "@/components/ToastProvider";
+import { API_URL, api } from "@/lib/api";
 import { Submission } from "@/lib/types";
 
 const panelClass = "rounded-2xl border border-[#8496b01f] bg-[#132338] p-5 shadow-[0_18px_48px_rgba(0,0,0,.12)] sm:p-6";
@@ -14,6 +15,7 @@ const textareaClass = "app-textarea min-h-[100px] w-full resize-y rounded-xl bor
 export default function SubmissionPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { notify } = useToast();
   const [data, setData] = useState<Submission | null>(null);
   const [score, setScore] = useState("");
   const [note, setNote] = useState("");
@@ -27,7 +29,9 @@ export default function SubmissionPage() {
       setScore(String(row.score ?? ""));
       setNote(row.feedback?.teacher_note ?? "");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load submission");
+      const message = err instanceof Error ? err.message : "Could not load submission";
+      setError(message);
+      notify(message, "error");
     }
   }
 
@@ -44,9 +48,28 @@ export default function SubmissionPage() {
         method: "PATCH",
         body: JSON.stringify({ score: Number(score), teacher_note: note || null }),
       });
+      notify("Review saved", "success");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Review update failed");
+      const message = err instanceof Error ? err.message : "Review update failed";
+      setError(message);
+      notify(message, "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function approveAsIs() {
+    setSaving(true);
+    setError("");
+    try {
+      await api(`/submissions/${id}/approve`, { method: "POST" });
+      notify("Submission approved", "success");
+      await load();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Approval failed";
+      setError(message);
+      notify(message, "error");
     } finally {
       setSaving(false);
     }
@@ -57,19 +80,24 @@ export default function SubmissionPage() {
     setError("");
     try {
       await api<void>(`/submissions/${id}`, { method: "DELETE" });
+      notify("Submission deleted", "success");
       router.push("/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete submission");
+      const message = err instanceof Error ? err.message : "Could not delete submission";
+      setError(message);
+      notify(message, "error");
     }
   }
 
   const confidence = data?.confidence != null ? Math.round(data.confidence * 100) : null;
+  const fileUrl = `${API_URL}/submissions/${id}/file`;
+  const extractedQuestions = data?.extracted_answers?.questions ?? [];
 
   return (
     <div className="app-background min-h-screen">
       <Header />
       <main className="mx-auto w-[min(1180px,92vw)] pb-20 pt-10 sm:pt-12">
-        <Link className="inline-flex items-center gap-2 text-sm text-[#8496B0] transition hover:text-[#00C9A7]" href="/dashboard">← Dashboard</Link>
+        <Link className="inline-flex items-center gap-2 text-sm text-[#8496B0] transition hover:text-[#00C9A7]" href={data?.assignment?.id ? `/assignments/${data.assignment.id}` : "/dashboard"}>← Back to assignment</Link>
         <div className="mt-5 flex flex-col justify-between gap-4 border-b border-[#8496b01f] pb-8 md:flex-row md:items-end">
           <div>
             <div className="mb-3 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">Submission review</div>
@@ -92,7 +120,35 @@ export default function SubmissionPage() {
 
         {error && <div className="mt-6 rounded-xl border border-[#f8717159] bg-[#f8717112] px-4 py-3 text-sm text-[#FCA5A5]">{error}</div>}
 
-        <div className="mt-6 grid items-start gap-6 lg:grid-cols-[1fr_350px]">
+        <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+          <section className={panelClass}>
+            <div className="mb-6 flex flex-col justify-between gap-3 border-b border-[#8496b01a] pb-5 sm:flex-row sm:items-center">
+              <div><h2 className="font-display text-2xl font-semibold">Original work</h2><p className="mt-1 text-sm text-[#8496B0]">Uploaded worksheet used for extraction and grading.</p></div>
+              {data?.mime_type && <span className="rounded-full border border-[#8496b033] bg-[#8496b014] px-2.5 py-1 font-mono text-[11px] text-[#8496B0]">{data.mime_type}</span>}
+            </div>
+            <div className="overflow-hidden rounded-xl border border-[#8496b01f] bg-[#0B1829]">
+              {data?.mime_type?.startsWith("image/") ? (
+                <img className="max-h-[720px] w-full object-contain" src={fileUrl} alt={data.original_filename} />
+              ) : data?.mime_type === "application/pdf" ? (
+                <iframe className="h-[720px] w-full" src={fileUrl} title={data.original_filename} />
+              ) : (
+                <div className="p-8 text-center text-sm text-[#8496B0]">Original file preview is available after the submission loads.</div>
+              )}
+            </div>
+            <div className="mt-5 rounded-xl border border-[#8496b01f] bg-[#0B1829] p-4">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Extraction notes</div>
+              <p className="text-sm leading-6 text-[#E2EAF4]">{data?.extracted_answers?.document_notes || "No extraction notes were recorded."}</p>
+              {extractedQuestions.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {extractedQuestions.map((question, index) => (
+                    <pre className="overflow-auto rounded-lg bg-[#132338] p-3 text-xs leading-5 text-[#CFE7FF]" key={index}>{JSON.stringify(question, null, 2)}</pre>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+
+          <div className="space-y-6">
           <section className={panelClass}>
             <div className="mb-6 flex flex-col justify-between gap-3 border-b border-[#8496b01a] pb-5 sm:flex-row sm:items-center">
               <div><h2 className="font-display text-2xl font-semibold">Question results</h2><p className="mt-1 text-sm text-[#8496B0]">AI-extracted work, scoring rationale, and confidence.</p></div>
@@ -126,7 +182,7 @@ export default function SubmissionPage() {
             </div>
           </section>
 
-          <aside className="space-y-6">
+          <aside className="grid gap-6 lg:grid-cols-2 xl:grid-cols-1">
             <div className={panelClass}>
               <div className="mb-4 flex items-center justify-between"><h2 className="font-display text-xl font-semibold">AI summary</h2><span className="text-lg">🧠</span></div>
               <p className="text-sm leading-6 text-[#E2EAF4]">{data?.feedback?.summary || "No summary yet."}</p>
@@ -149,9 +205,13 @@ export default function SubmissionPage() {
                 <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Teacher note</span>
                 <textarea className={textareaClass} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional note for the student" />
               </label>
-              <button disabled={saving} className="app-btn app-btn-primary app-btn-full app-btn-lg mt-5">{saving ? "Saving…" : "Approve result"}</button>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <button disabled={saving} className="app-btn app-btn-primary app-btn-full app-btn-lg" type="submit">{saving ? "Saving..." : "Save review"}</button>
+                <button disabled={saving} className="app-btn app-btn-secondary app-btn-full app-btn-lg" onClick={approveAsIs} type="button">Approve as-is</button>
+              </div>
             </form>
           </aside>
+          </div>
         </div>
       </main>
     </div>
