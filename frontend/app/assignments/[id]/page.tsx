@@ -579,8 +579,8 @@ export default function AssignmentPage() {
             <form className={`${panelClass} xl:col-span-2`} onSubmit={saveAssignment}>
               <div className="mb-5">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">Assignment setup</div>
-                <h2 className="font-display text-xl font-semibold">Edit rubric and key</h2>
-                <p className="mt-1 text-xs leading-5 text-[#8496B0]">Save creates a version. Regrade existing submissions after rubric changes.</p>
+                <h2 className="font-display text-xl font-semibold">Edit solution and rubric</h2>
+                <p className="mt-1 text-xs leading-5 text-[#8496B0]">Save creates a version. Regrade existing submissions after changing the question, solution, or rubric.</p>
               </div>
               <label className="block">
                 <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Title</span>
@@ -608,11 +608,11 @@ export default function AssignmentPage() {
                       </div>
                       <div className="grid gap-3 sm:grid-cols-[80px_1fr_90px]">
                         <input className={inputClass} value={question.number} onChange={(event) => updateEditQuestion(index, { number: event.target.value })} required />
-                        <input className={inputClass} value={question.prompt} onChange={(event) => updateEditQuestion(index, { prompt: event.target.value })} placeholder="Prompt" required />
+                        <textarea className={textareaClass} value={question.prompt} onChange={(event) => updateEditQuestion(index, { prompt: event.target.value })} placeholder="Question prompt" required />
                         <input className={inputClass} min="0.5" step="0.5" type="number" value={question.maxScore} onChange={(event) => updateEditQuestion(index, { maxScore: event.target.value })} required />
                       </div>
-                      <textarea className={`${textareaClass} mt-3`} value={question.expectedAnswer} onChange={(event) => updateEditQuestion(index, { expectedAnswer: event.target.value })} placeholder="Expected answer" required />
-                      <textarea className={`${textareaClass} mt-3`} value={question.criteria} onChange={(event) => updateEditQuestion(index, { criteria: event.target.value })} placeholder="Scoring criteria, one per line" />
+                      <textarea className={`${textareaClass} mt-3`} value={question.expectedAnswer} onChange={(event) => updateEditQuestion(index, { expectedAnswer: event.target.value })} placeholder="Solution / expected answer" required />
+                      <textarea className={`${textareaClass} mt-3`} value={question.criteria} onChange={(event) => updateEditQuestion(index, { criteria: event.target.value })} placeholder="Rubric / scoring criteria, one per line" />
                       <textarea className={`${textareaClass} mt-3`} value={question.commonMistakes} onChange={(event) => updateEditQuestion(index, { commonMistakes: event.target.value })} placeholder="Common mistakes, one per line" />
                     </div>
                   ))}

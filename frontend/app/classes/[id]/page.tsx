@@ -313,7 +313,7 @@ export default function ClassPage() {
               <div className="mb-6">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">New grading workflow</div>
                 <h2 className="font-display text-2xl font-semibold">Create assignment</h2>
-                <p className="mt-1 text-sm text-[#8496B0]">Build the questions, answer key, and rubric without writing JSON.</p>
+                <p className="mt-1 text-sm text-[#8496B0]">Paste the assignment instructions, question, full solution, rubric, and likely mistakes in plain language.</p>
               </div>
               <div className="grid gap-4 sm:grid-cols-[1fr_220px]">
                 <label className="block">
@@ -337,8 +337,8 @@ export default function ClassPage() {
                 </label>
               </div>
               <label className="mt-4 block">
-                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Description</span>
-                <textarea className={textareaClass} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Optional instructions, unit, or teacher notes" />
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Description / student instructions</span>
+                <textarea className={textareaClass} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Example: Show all setup, derivatives, critical point work, units, and minimum verification." />
               </label>
               <label className="mt-4 block">
                 <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">General grading rules</span>
@@ -358,8 +358,8 @@ export default function ClassPage() {
                         <input className={inputClass} required value={question.number} onChange={(event) => updateQuestion(index, { number: event.target.value })} />
                       </label>
                       <label className="block">
-                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Prompt</span>
-                        <input className={inputClass} required value={question.prompt} onChange={(event) => updateQuestion(index, { prompt: event.target.value })} placeholder="Solve 2x + 3 = 11" />
+                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Question prompt</span>
+                        <textarea className={textareaClass} required value={question.prompt} onChange={(event) => updateQuestion(index, { prompt: event.target.value })} placeholder="Paste the full question students will answer." />
                       </label>
                       <label className="block">
                         <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Points</span>
@@ -368,12 +368,12 @@ export default function ClassPage() {
                     </div>
                     <div className="mt-4 grid gap-4 xl:grid-cols-3">
                       <label className="block">
-                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Expected answer</span>
-                        <textarea className={textareaClass} required value={question.expectedAnswer} onChange={(event) => updateQuestion(index, { expectedAnswer: event.target.value })} />
+                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Solution / expected answer</span>
+                        <textarea className={textareaClass} required value={question.expectedAnswer} onChange={(event) => updateQuestion(index, { expectedAnswer: event.target.value })} placeholder="Paste the correct solution steps and final answer." />
                       </label>
                       <label className="block">
-                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Scoring criteria</span>
-                        <textarea className={textareaClass} value={question.criteria} onChange={(event) => updateQuestion(index, { criteria: event.target.value })} placeholder="One criterion per line" />
+                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Rubric / scoring criteria</span>
+                        <textarea className={textareaClass} value={question.criteria} onChange={(event) => updateQuestion(index, { criteria: event.target.value })} placeholder="One rubric item per line, with points if helpful." />
                       </label>
                       <label className="block">
                         <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Common mistakes</span>
