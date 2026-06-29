@@ -151,6 +151,11 @@ export default function ClassPage() {
     setQuestions((current) => current.length === 1 ? current : current.filter((_, questionIndex) => questionIndex !== index));
   }
 
+  function updateTotalPoints(value: string) {
+    if (questions.length !== 1) return;
+    updateQuestion(0, { maxScore: value });
+  }
+
   async function deleteClass() {
     if (!data) return;
     const confirmed = await confirm({
@@ -233,6 +238,9 @@ export default function ClassPage() {
     }
   }
 
+  const totalPoints = questions.reduce((sum, question) => sum + Number(question.maxScore || 0), 0);
+  const totalPointsValue = questions.length === 1 ? questions[0]?.maxScore ?? "" : String(totalPoints);
+
   return (
     <div className="app-background min-h-screen">
       <Header />
@@ -314,7 +322,18 @@ export default function ClassPage() {
                 </label>
                 <label className="block">
                   <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Total points</span>
-                  <input className={inputClass} readOnly value={questions.reduce((sum, question) => sum + Number(question.maxScore || 0), 0)} />
+                  <input
+                    className={inputClass}
+                    min="0.5"
+                    onChange={(event) => updateTotalPoints(event.target.value)}
+                    readOnly={questions.length !== 1}
+                    step="0.5"
+                    type="number"
+                    value={totalPointsValue}
+                  />
+                  <p className="mt-2 text-xs leading-5 text-[#8496B0]">
+                    {questions.length === 1 ? "This updates Question 1 points." : "Calculated from the question point values below."}
+                  </p>
                 </label>
               </div>
               <label className="mt-4 block">
