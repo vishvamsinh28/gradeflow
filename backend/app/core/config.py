@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     gemini_api_key: str
     gemini_model: str = "gemini-3.1-flash-lite"
     grading_confidence_threshold: float = Field(default=0.72, ge=0, le=1)
+    frontend_origins: str | None = None
 
     langsmith_tracing: bool
     langsmith_api_key: str = Field(min_length=1)
@@ -49,6 +50,16 @@ class Settings(BaseSettings):
         if self.cookie_samesite == "none" and not self.cookie_secure:
             raise ValueError("COOKIE_SECURE must be true when COOKIE_SAMESITE=none")
         return self
+
+    @property
+    def allowed_frontend_origins(self) -> list[str]:
+        origins = [self.frontend_origin, *(self.frontend_origins or "").split(",")]
+        cleaned = []
+        for origin in origins:
+            normalized = origin.strip().rstrip("/")
+            if normalized and normalized not in cleaned:
+                cleaned.append(normalized)
+        return cleaned
 
 
 @lru_cache

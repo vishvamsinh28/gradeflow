@@ -167,7 +167,7 @@ Assignment edits also create `assignment_versions` rows so rubric changes are tr
 
 ## Production notes
 
-- If the frontend and API are on different domains, set `FRONTEND_ORIGIN` to the exact frontend URL, set `COOKIE_SECURE=true`, and set `COOKIE_SAMESITE=none` so browser `credentials: "include"` requests can carry the HTTP-only session cookie over HTTPS.
+- If the frontend and API are on different domains, set `FRONTEND_ORIGIN` to the exact production frontend origin. If you need more than one allowed frontend, set `FRONTEND_ORIGINS` to a comma-separated list such as `https://app.example.com,https://www.example.com`. Use origins only: no trailing paths. Also set `COOKIE_SECURE=true` and `COOKIE_SAMESITE=none` so browser `credentials: "include"` requests can carry the HTTP-only session cookie over HTTPS.
 - If the frontend and API are under the same site, such as `app.example.com` and `api.example.com`, `COOKIE_SAMESITE=lax` can be used with `COOKIE_SECURE=true`.
 - Keep the state-changing endpoint Origin checks enabled. Add per-request CSRF tokens if you need stronger browser-side request forgery protection.
 - Replace synchronous grading with a worker/queue for larger batches.

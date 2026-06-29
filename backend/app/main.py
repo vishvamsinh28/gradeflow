@@ -9,7 +9,7 @@ settings = get_settings()
 app = FastAPI(title=settings.app_name, version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_origin],
+    allow_origins=settings.allowed_frontend_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -20,7 +20,7 @@ app.add_middleware(
 async def require_trusted_origin_for_mutations(request: Request, call_next):
     if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
         origin = request.headers.get("origin")
-        if origin != settings.frontend_origin:
+        if origin is None or origin.rstrip("/") not in settings.allowed_frontend_origins:
             return JSONResponse(
                 status_code=403,
                 content={"detail": "Request origin is not allowed"},

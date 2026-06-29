@@ -9,6 +9,7 @@ os.environ.setdefault("LANGSMITH_API_KEY", "test-key")
 os.environ.setdefault("LANGSMITH_PROJECT", "gradeflow-test")
 
 from app.core.security import create_access_token, decode_access_token, hash_password, verify_password
+from app.core.config import Settings
 
 
 def test_password_round_trip():
@@ -23,3 +24,24 @@ def test_jwt_round_trip():
     payload = decode_access_token(token)
     assert payload["sub"] == "user-123"
     assert payload["email"] == "teacher@example.com"
+
+
+def test_frontend_origin_list_is_normalized():
+    settings = Settings(
+        supabase_url="https://example.supabase.co",
+        supabase_secret_key="test-key",
+        jwt_secret="a-test-secret-that-is-long-enough",
+        gemini_api_key="test-key",
+        langsmith_tracing=True,
+        langsmith_api_key="test-key",
+        langsmith_project="gradeflow-test",
+        frontend_origin="https://app.example.com/",
+        frontend_origins="https://app.example.com, https://www.example.com/",
+        cookie_secure=True,
+        cookie_samesite="none",
+    )
+
+    assert settings.allowed_frontend_origins == [
+        "https://app.example.com",
+        "https://www.example.com",
+    ]
