@@ -69,7 +69,7 @@ make db-setup
 
 The script reads `DB_URL` from `backend/.env` and runs `backend/supabase/schema.sql` through `psql`.
 
-The backend uses `SUPABASE_PUBLISHABLE_KEY` for Supabase API access and `DB_URL` only for direct database setup.
+The backend uses `SUPABASE_SECRET_KEY` for server-side Supabase API access and `DB_URL` only for direct database setup. Use a server-only Supabase service role or secret key here; never expose this key in frontend environment variables or browser code.
 
 ## 2. Environment configuration
 
@@ -79,6 +79,15 @@ The backend uses `SUPABASE_PUBLISHABLE_KEY` for Supabase API access and `DB_URL`
 - `frontend/.env.local` from `frontend/.env.example`
 
 Edit `backend/.env` with your Supabase, Gemini, JWT, and optional LangSmith values. The frontend example already points to the local FastAPI server. If you already have `frontend/.env`, the setup and start scripts keep using it instead of creating a duplicate frontend env file.
+
+For Supabase, copy the project URL and a server-only service role/secret key into `backend/.env`:
+
+```env
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SECRET_KEY=your-server-only-service-role-or-secret-key
+```
+
+Registration and dashboard writes go through FastAPI, which enforces ownership checks before querying Supabase. The secret key is needed because this project uses custom JWT cookies rather than Supabase Auth, so Supabase row-level security cannot identify the current app user from the publishable key.
 
 ## 3. Start development servers
 

@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@source "./**/*.{ts,tsx}";
+
 @theme {
   --font-sans: "Inter", sans-serif;
   --font-display: "Space Grotesk", sans-serif;

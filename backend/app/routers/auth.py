@@ -17,6 +17,11 @@ def handle_database_error(error: APIError) -> None:
             status_code=503,
             detail="Supabase schema is not ready. Run make db-setup from the project root, then retry.",
         ) from error
+    if error.code == "42501":
+        raise HTTPException(
+            status_code=503,
+            detail="Supabase rejected the database request because row-level security blocked it. Set backend/.env SUPABASE_SECRET_KEY to your server-only Supabase service role/secret key, restart the backend, and retry.",
+        ) from error
     raise error
 
 

@@ -10,10 +10,10 @@ class Settings(BaseSettings):
     frontend_origin: str = "http://localhost:3000"
 
     supabase_url: str
-    supabase_publishable_key: str = Field(
+    supabase_secret_key: str = Field(
         validation_alias=AliasChoices(
-            "SUPABASE_PUBLISHABLE_KEY",
-            "SUBABASE_PUBLISHABLE_KEY",
+            "SUPABASE_SECRET_KEY",
+            "SUPABASE_SERVICE_ROLE_KEY",
         )
     )
     supabase_storage_bucket: str = "submissions"
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     cookie_secure: bool = False
 
     gemini_api_key: str
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.1-flash-lite"
     grading_confidence_threshold: float = Field(default=0.72, ge=0, le=1)
 
     model_config = SettingsConfigDict(

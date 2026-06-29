@@ -1,7 +1,7 @@
 import os
 
 os.environ.setdefault("SUPABASE_URL", "https://example.supabase.co")
-os.environ.setdefault("SUPABASE_PUBLISHABLE_KEY", "test-key")
+os.environ.setdefault("SUPABASE_SECRET_KEY", "test-key")
 os.environ.setdefault("JWT_SECRET", "a-test-secret-that-is-long-enough")
 os.environ.setdefault("GEMINI_API_KEY", "test-key")
 
