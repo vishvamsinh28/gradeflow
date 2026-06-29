@@ -78,7 +78,7 @@ The backend uses `SUPABASE_SECRET_KEY` for server-side Supabase API access and `
 - `backend/.env` from `backend/.env.example`
 - `frontend/.env.local` from `frontend/.env.example`
 
-Edit `backend/.env` with your Supabase, Gemini, JWT, and optional LangSmith values. The frontend example already points to the local FastAPI server. If you already have `frontend/.env`, the setup and start scripts keep using it instead of creating a duplicate frontend env file.
+Edit `backend/.env` with your Supabase, Gemini, JWT, and LangSmith values. The frontend example already points to the local FastAPI server. If you already have `frontend/.env`, the setup and start scripts keep using it instead of creating a duplicate frontend env file.
 
 For Supabase, copy the project URL and a server-only service role/secret key into `backend/.env`:
 
@@ -111,7 +111,7 @@ That error means the backend can reach Supabase, but PostgREST cannot find the a
 
 ## LangSmith
 
-Set these variables in the backend environment:
+LangSmith tracing is required. Set these variables in the backend environment:
 
 ```env
 LANGSMITH_TRACING=true
@@ -119,7 +119,7 @@ LANGSMITH_API_KEY=...
 LANGSMITH_PROJECT=gradeflow-dev
 ```
 
-LangGraph executions will then appear as traces. The graph deliberately keeps raw worksheet bytes out of graph state so uploaded student work is not copied into node state traces.
+The backend validates these on startup and rejects `LANGSMITH_TRACING=false`. LangGraph executions appear as traces. The graph deliberately keeps raw worksheet bytes out of graph state so uploaded student work is not copied into node state traces.
 
 ## Grading graph
 

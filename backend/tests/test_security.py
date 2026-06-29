@@ -4,6 +4,9 @@ os.environ.setdefault("SUPABASE_URL", "https://example.supabase.co")
 os.environ.setdefault("SUPABASE_SECRET_KEY", "test-key")
 os.environ.setdefault("JWT_SECRET", "a-test-secret-that-is-long-enough")
 os.environ.setdefault("GEMINI_API_KEY", "test-key")
+os.environ.setdefault("LANGSMITH_TRACING", "true")
+os.environ.setdefault("LANGSMITH_API_KEY", "test-key")
+os.environ.setdefault("LANGSMITH_PROJECT", "gradeflow-test")
 
 from app.core.security import create_access_token, decode_access_token, hash_password, verify_password
 

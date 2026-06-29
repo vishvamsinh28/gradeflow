@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,12 +28,22 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-3.1-flash-lite"
     grading_confidence_threshold: float = Field(default=0.72, ge=0, le=1)
 
+    langsmith_tracing: bool
+    langsmith_api_key: str = Field(min_length=1)
+    langsmith_project: str = Field(min_length=1)
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
     )
+
+    @model_validator(mode="after")
+    def require_langsmith_tracing(self) -> "Settings":
+        if not self.langsmith_tracing:
+            raise ValueError("LANGSMITH_TRACING must be true because LangSmith tracing is required")
+        return self
 
 
 @lru_cache
