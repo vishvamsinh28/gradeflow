@@ -1,5 +1,6 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 const LEGACY_TOKEN_KEY = "gradeflow_access_token";
+const SESSION_TOKEN_KEY = "gradeflow_session_token";
 
 export class APIError extends Error {
   constructor(message: string, public status: number) {
@@ -10,12 +11,28 @@ export class APIError extends Error {
 export function clearAuthToken() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(LEGACY_TOKEN_KEY);
+  window.sessionStorage.removeItem(SESSION_TOKEN_KEY);
+}
+
+export function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.sessionStorage.getItem(SESSION_TOKEN_KEY);
+}
+
+export function setAuthToken(token: string) {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(LEGACY_TOKEN_KEY);
+  window.sessionStorage.setItem(SESSION_TOKEN_KEY, token);
 }
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (!(init.body instanceof FormData) && init.body) {
     headers.set("Content-Type", "application/json");
+  }
+  const token = getAuthToken();
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
   }
   const response = await fetch(`${API_URL}${path}`, {
     ...init,

@@ -2,9 +2,13 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, setAuthToken } from "@/lib/api";
 
 type AuthMode = "login" | "register";
+
+type AuthResponse = {
+  access_token: string;
+};
 
 type AuthModalProps = {
   open: boolean;
@@ -43,10 +47,11 @@ export function AuthModal({ open, initialMode, onClose }: AuthModalProps) {
     setBusy(true);
     setError("");
     try {
-      await api(`/auth/${mode}`, {
+      const result = await api<AuthResponse>(`/auth/${mode}`, {
         method: "POST",
         body: JSON.stringify(mode === "register" ? { full_name: fullName, email, password } : { email, password }),
       });
+      setAuthToken(result.access_token);
       router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed");
