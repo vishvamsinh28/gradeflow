@@ -348,12 +348,24 @@ async def upload_submission(
         if not student.data:
             raise HTTPException(status_code=400, detail="Student does not belong to this class")
     elif student_name and student_name.strip():
-        student = (
+        cleaned_student_name = student_name.strip()
+        existing_student = (
             db.table("students")
-            .insert({"class_id": assignment["class_id"], "name": student_name.strip()})
+            .select("id")
+            .eq("class_id", assignment["class_id"])
+            .ilike("name", cleaned_student_name)
+            .limit(1)
             .execute()
         )
-        student_id = student.data[0]["id"]
+        if existing_student.data:
+            student_id = existing_student.data[0]["id"]
+        else:
+            student = (
+                db.table("students")
+                .insert({"class_id": assignment["class_id"], "name": cleaned_student_name})
+                .execute()
+            )
+            student_id = student.data[0]["id"]
     storage = SubmissionStorage(db)
     path = await storage.upload(user["id"], assignment_id, file)
     response = db.table("submissions").insert(

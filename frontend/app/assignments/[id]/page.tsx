@@ -101,7 +101,8 @@ export default function AssignmentPage() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [history, setHistory] = useState<AssignmentHistory | null>(null);
   const [files, setFiles] = useState<File[]>([]);
-  const [studentName, setStudentName] = useState("");
+  const [selectedStudentId, setSelectedStudentId] = useState("");
+  const [newStudentName, setNewStudentName] = useState("");
   const [error, setError] = useState("");
   const [gradingId, setGradingId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -140,6 +141,13 @@ export default function AssignmentPage() {
     load();
   }, [id]);
 
+  useEffect(() => {
+    if (files.length > 1) {
+      setSelectedStudentId("");
+      setNewStudentName("");
+    }
+  }, [files.length]);
+
   async function upload(event: FormEvent) {
     event.preventDefault();
     if (!files.length) return;
@@ -148,11 +156,17 @@ export default function AssignmentPage() {
       for (const file of files) {
         const body = new FormData();
         body.append("file", file);
-        if (studentName.trim() && files.length === 1) body.append("student_name", studentName.trim());
+        if (files.length === 1 && selectedStudentId && selectedStudentId !== "__new__") {
+          body.append("student_id", selectedStudentId);
+        }
+        if (files.length === 1 && selectedStudentId === "__new__" && newStudentName.trim()) {
+          body.append("student_name", newStudentName.trim());
+        }
         await api(`/assignments/${id}/submissions`, { method: "POST", body });
       }
       setFiles([]);
-      setStudentName("");
+      setSelectedStudentId("");
+      setNewStudentName("");
       notify("Submission uploaded", "success");
       await load();
     } catch (err) {
@@ -467,7 +481,7 @@ export default function AssignmentPage() {
           )}
         </section>
 
-        <div className="mt-6 grid items-start gap-6 xl:grid-cols-[1fr_460px]">
+        <div className="mt-6 space-y-6">
           <section className={panelClass}>
             <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
               <div><h2 className="font-display text-2xl font-semibold">Submissions</h2><p className="mt-1 text-sm text-[#8496B0]">Open a submission for question-level feedback and teacher review.</p></div>
@@ -521,8 +535,8 @@ export default function AssignmentPage() {
             </div>
           </section>
 
-          <aside className="space-y-6">
-            <form className={panelClass} onSubmit={saveAssignment}>
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.7fr)]">
+            <form className={`${panelClass} xl:col-span-2`} onSubmit={saveAssignment}>
               <div className="mb-5">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">Assignment setup</div>
                 <h2 className="font-display text-xl font-semibold">Edit rubric and key</h2>
@@ -601,26 +615,36 @@ export default function AssignmentPage() {
             <form className={panelClass} onSubmit={upload}>
               <div className="mb-5"><div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">New submissions</div><h2 className="font-display text-xl font-semibold">Batch upload work</h2></div>
               <label className="block">
-                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Student name</span>
-                <input
-                  className={inputClass}
-                  list="assignment-students"
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Student</span>
+                <select
+                  className="app-select w-full rounded-xl border border-[#8496b02e] bg-[#0B1829] px-4 py-3 text-sm text-[#F8FAFC]"
                   disabled={files.length > 1}
-                  onChange={(event) => setStudentName(event.target.value)}
-                  placeholder={files.length > 1 ? "Leave blank for batch upload" : "Type or choose a student"}
-                  value={studentName}
-                />
-                <datalist id="assignment-students">
-                  {assignment?.students?.map((student) => <option value={student.name} key={student.id} />)}
-                </datalist>
+                  onChange={(event) => setSelectedStudentId(event.target.value)}
+                  value={selectedStudentId}
+                >
+                  <option value="">{files.length > 1 ? "Leave unassigned for batch upload" : "Choose an existing student"}</option>
+                  {assignment?.students?.map((student) => <option value={student.id} key={student.id}>{student.name}</option>)}
+                  <option value="__new__">Add a new student...</option>
+                </select>
               </label>
+              {selectedStudentId === "__new__" && files.length <= 1 && (
+                <label className="mt-4 block">
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">New student name</span>
+                  <input
+                    className={inputClass}
+                    onChange={(event) => setNewStudentName(event.target.value)}
+                    placeholder="Enter a name only if this student is not in the roster"
+                    value={newStudentName}
+                  />
+                </label>
+              )}
               <label className="mt-4 block">
                 <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Worksheet</span>
                 <input className={inputClass} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple onChange={(event) => setFiles(Array.from(event.target.files ?? []))} required />
               </label>
               <button className="app-btn app-btn-primary app-btn-full app-btn-lg mt-5">Upload {files.length > 1 ? `${files.length} submissions` : "submission"}</button>
             </form>
-          </aside>
+          </div>
         </div>
       </main>
     </div>
