@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Header } from "@/components/Header";
 
 const panelClass = "rounded-2xl border border-[#8496b01f] bg-[#132338] p-5 shadow-[0_18px_48px_rgba(0,0,0,.12)] sm:p-6";
@@ -102,11 +103,19 @@ const scoreRows = [
   ["Q3", "Unreadable final step", "0 / 5", "61%", "Needs review"],
 ];
 
+const realImageSteps = [
+  ["Assignment", "Calculus Optimization Challenge"],
+  ["Student upload", "Screenshot image of handwritten calculus work"],
+  ["AI score", "6 / 12"],
+  ["Confidence", "100%"],
+  ["Error category", "Conceptual error"],
+];
+
 export default function GuidePage() {
   return (
     <div className="app-background min-h-screen">
       <Header />
-      <main className="mx-auto w-[min(1180px,92vw)] pb-20 pt-10 sm:pt-12">
+      <main className="mx-auto w-[min(1180px,92vw)] max-w-full overflow-hidden pb-20 pt-10 sm:pt-12">
         <section className="border-b border-[#8496b01f] pb-8">
           <div className="mb-3 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">Product guide</div>
           <h1 className="font-display text-4xl font-bold tracking-[-1.5px] sm:text-5xl">How to use GradeFlow</h1>
@@ -117,6 +126,7 @@ export default function GuidePage() {
             <a className="app-btn app-btn-primary" href="#workflow">Start with workflow</a>
             <a className="app-btn app-btn-ghost" href="#controls">Button guide</a>
             <a className="app-btn app-btn-ghost" href="#example">See grading example</a>
+            <a className="app-btn app-btn-ghost" href="#image-example">Image example</a>
             <Link className="app-btn app-btn-secondary" href="/dashboard">Go to dashboard</Link>
           </div>
         </section>
@@ -176,8 +186,8 @@ export default function GuidePage() {
           </div>
         </section>
 
-        <section id="example" className="mt-6 grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-          <div className={panelClass}>
+        <section id="example" className="mt-6 grid min-w-0 gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+          <div className={`${panelClass} min-w-0`}>
             <div className="mb-5">
               <div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">Assignment example</div>
               <h2 className="font-display text-2xl font-semibold">Input you give AI</h2>
@@ -191,12 +201,12 @@ export default function GuidePage() {
             </div>
           </div>
 
-          <div className={panelClass}>
+          <div className={`${panelClass} min-w-0`}>
             <div className="mb-5">
               <div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">AI output</div>
               <h2 className="font-display text-2xl font-semibold">What grading looks like</h2>
             </div>
-            <div className="overflow-x-auto">
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[640px] border-separate border-spacing-y-2 text-left text-sm">
                 <thead className="text-xs uppercase tracking-[0.08em] text-[#8496B0]">
                   <tr>
@@ -220,8 +230,64 @@ export default function GuidePage() {
                 </tbody>
               </table>
             </div>
-            <div className="mt-5 rounded-xl border border-[#f59e0b33] bg-[#f59e0b0d] p-4 text-sm leading-6 text-[#FCD68A]">
+            <div className="space-y-3 md:hidden">
+              {scoreRows.map(([question, reasoning, score, confidence, action]) => (
+                <div className="rounded-xl border border-[#8496b01f] bg-[#0B1829] p-4" key={question}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="font-display font-semibold text-[#E2EAF4]">{question}</div>
+                    <div className="shrink-0 font-mono text-[#F8FAFC]">{score}</div>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-[#8496B0]">{reasoning}</p>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                    <span className="rounded-full border border-[#00c9a733] bg-[#00c9a714] px-2.5 py-1 text-[#00C9A7]">{confidence}</span>
+                    <span className="rounded-full border border-[#8496b026] bg-[#8496b00f] px-2.5 py-1 text-[#E2EAF4]">{action}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-5 rounded-xl border border-[#f59e0b33] bg-[#f59e0b0d] p-4 text-sm leading-6 text-[#FCD68A] break-words">
               If you edit a score, click Save changes. If AI is correct, click Approve AI score. Published results only appear to students after you click Publish to students on the assignment page.
+            </div>
+          </div>
+        </section>
+
+        <section id="image-example" className={`${panelClass} mt-6`}>
+          <div className="mb-6">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">Real submitted image</div>
+            <h2 className="font-display text-2xl font-semibold">Example from Calculus Optimization Challenge</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#8496B0]">
+              This is a real uploaded PNG from the assignment page. GradeFlow stores the image, sends it to AI with the assignment rubric, then returns a score, confidence, error type, and feedback.
+            </p>
+          </div>
+
+          <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+            <div className="self-start overflow-hidden rounded-xl border border-[#8496b01f] bg-[#07111f]">
+              <Image
+                src="/guide/calculus-optimization-submission.png"
+                alt="Submitted handwritten calculus optimization work"
+                width={1860}
+                height={1014}
+                className="block h-auto w-full"
+                priority={false}
+              />
+            </div>
+
+            <div className="min-w-0 space-y-3">
+              {realImageSteps.map(([label, value]) => (
+                <ExampleBlock label={label} value={value} key={label} />
+              ))}
+              <div className="rounded-xl border border-[#f59e0b33] bg-[#f59e0b0d] p-4">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-[#FCD68A]">AI feedback</div>
+                <p className="text-sm leading-6 text-[#FCD68A]">
+                  The student identified the volume constraint and the second-derivative method, but minimized surface area instead of the cost function. The expected setup needed the different top, bottom, and side costs.
+                </p>
+              </div>
+              <div className="rounded-xl border border-[#00c9a733] bg-[#00c9a70d] p-4">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-[#00C9A7]">Teacher takeaway</div>
+                <p className="text-sm leading-6 text-[#A7F3E7]">
+                  If the score looks right, the teacher can leave it completed. If the rubric should award more method credit, edit the score on the submission page and click Save changes.
+                </p>
+              </div>
             </div>
           </div>
         </section>
