@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { ToastProvider } from "@/components/ToastProvider";
 import "./globals.css";
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <ToastProvider>
           <ConfirmProvider>{children}</ConfirmProvider>
         </ToastProvider>
+        <Analytics />
       </body>
     </html>
   );
