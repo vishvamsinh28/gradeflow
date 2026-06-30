@@ -326,6 +326,7 @@ export default function ClassPage() {
                     className={inputClass}
                     min="0.5"
                     onChange={(event) => updateTotalPoints(event.target.value)}
+                    onWheel={(event) => event.currentTarget.blur()}
                     readOnly={questions.length !== 1}
                     step="0.5"
                     type="number"
@@ -363,7 +364,7 @@ export default function ClassPage() {
                       </label>
                       <label className="block">
                         <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Points</span>
-                        <input className={inputClass} min="1" required type="number" value={question.maxScore} onChange={(event) => updateQuestion(index, { maxScore: event.target.value })} />
+                        <input className={inputClass} min="1" onWheel={(event) => event.currentTarget.blur()} required type="number" value={question.maxScore} onChange={(event) => updateQuestion(index, { maxScore: event.target.value })} />
                       </label>
                     </div>
                     <div className="mt-4 grid gap-4 xl:grid-cols-3">

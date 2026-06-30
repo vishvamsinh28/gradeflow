@@ -89,7 +89,7 @@ export default function SettingsPage() {
             </label>
             <label className="mt-4 block">
               <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Review threshold</span>
-              <input className={inputClass} min="0" max="1" step="0.01" type="number" value={settings?.confidence_threshold ?? 0.72} onChange={(event) => setSettings((current) => current ? { ...current, confidence_threshold: Number(event.target.value) } : current)} required />
+              <input className={inputClass} min="0" max="1" onWheel={(event) => event.currentTarget.blur()} step="0.01" type="number" value={settings?.confidence_threshold ?? 0.72} onChange={(event) => setSettings((current) => current ? { ...current, confidence_threshold: Number(event.target.value) } : current)} required />
               <p className="mt-2 text-xs leading-5 text-[#8496B0]">Grades below this confidence are routed to review.</p>
             </label>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">

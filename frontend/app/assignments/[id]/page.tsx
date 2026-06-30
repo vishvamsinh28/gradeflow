@@ -609,7 +609,7 @@ export default function AssignmentPage() {
                       <div className="grid items-start gap-3 sm:grid-cols-[112px_minmax(0,1fr)_132px]">
                         <input className={inputClass} value={question.number} onChange={(event) => updateEditQuestion(index, { number: event.target.value })} required />
                         <textarea className={textareaClass} value={question.prompt} onChange={(event) => updateEditQuestion(index, { prompt: event.target.value })} placeholder="Question prompt" required />
-                        <input className={inputClass} min="0.5" step="0.5" type="number" value={question.maxScore} onChange={(event) => updateEditQuestion(index, { maxScore: event.target.value })} required />
+                        <input className={inputClass} min="0.5" onWheel={(event) => event.currentTarget.blur()} step="0.5" type="number" value={question.maxScore} onChange={(event) => updateEditQuestion(index, { maxScore: event.target.value })} required />
                       </div>
                       <textarea className={`${textareaClass} mt-3`} value={question.expectedAnswer} onChange={(event) => updateEditQuestion(index, { expectedAnswer: event.target.value })} placeholder="Solution / expected answer" required />
                       <textarea className={`${textareaClass} mt-3`} value={question.criteria} onChange={(event) => updateEditQuestion(index, { criteria: event.target.value })} placeholder="Rubric / scoring criteria, one per line" />

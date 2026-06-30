@@ -197,7 +197,7 @@ button {
 .scroll-list {
   max-height: min(520px, 65svh);
   overflow-y: auto;
-  padding-right: 4px;
+  padding: 6px 4px 8px 0;
   scrollbar-color: rgba(132, 150, 176, 0.55) transparent;
   scrollbar-width: thin;
 }
@@ -327,7 +327,14 @@ button {
 }
 
 .app-input[type="number"] {
+  appearance: textfield;
   font-variant-numeric: tabular-nums;
+}
+
+.app-input[type="number"]::-webkit-inner-spin-button,
+.app-input[type="number"]::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
 }
 
 .app-input:disabled,

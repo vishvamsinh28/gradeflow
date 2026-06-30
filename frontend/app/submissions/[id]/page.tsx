@@ -211,7 +211,7 @@ export default function SubmissionPage() {
               <div className="mb-5"><div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">Human in the loop</div><h2 className="font-display text-xl font-semibold">Teacher review</h2><p className="mt-1 text-xs leading-5 text-[#8496B0]">Override the score or leave a final note before approval.</p></div>
               <label className="block">
                 <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Final score</span>
-                <input className={inputClass} type="number" min="0" max={data?.max_score} step="0.5" value={score} onChange={(event) => setScore(event.target.value)} required />
+                <input className={inputClass} type="number" min="0" max={data?.max_score} onWheel={(event) => event.currentTarget.blur()} step="0.5" value={score} onChange={(event) => setScore(event.target.value)} required />
               </label>
               <label className="mt-4 block">
                 <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Teacher note</span>
