@@ -63,6 +63,9 @@ export function Header() {
           Grade<span className="text-[#00C9A7]">Flow</span>
         </Link>
         <div className="header-nav-desktop items-center gap-3">
+          <Link href="/guide" className="app-btn app-btn-ghost">
+            Guide
+          </Link>
           <Link href="/review" className="app-btn app-btn-ghost">
             Review
           </Link>
@@ -92,6 +95,9 @@ export function Header() {
         </button>
         {menuOpen ? (
           <div className="header-menu-panel absolute right-0 top-[calc(100%+8px)] flex-col">
+            <Link href="/guide" className="header-menu-item app-btn app-btn-ghost app-btn-full" onClick={() => setMenuOpen(false)}>
+              Guide
+            </Link>
             <Link href="/review" className="header-menu-item app-btn app-btn-ghost app-btn-full" onClick={() => setMenuOpen(false)}>
               Review
             </Link>
