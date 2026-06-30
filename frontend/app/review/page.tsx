@@ -91,7 +91,7 @@ export default function ReviewPage() {
           {loading ? (
             <InlineLoading rows={4} />
           ) : items.length ? (
-            <div className="grid gap-3">
+            <div className="scroll-list scroll-list-lg grid gap-3">
               {items.map((item) => {
                 const confidence = item.confidence != null ? Math.round(item.confidence * 100) : null;
                 return (

@@ -154,7 +154,7 @@ export default function Dashboard() {
           {loading ? (
             <InlineLoading rows={3} />
           ) : reviewQueue.length ? (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="scroll-list scroll-list-sm grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {reviewQueue.slice(0, 6).map((item) => (
                 <Link className="rounded-xl border border-[#8496b01f] bg-[#0B1829] p-4 transition hover:border-[#00c9a759]" href={`/submissions/${item.id}`} key={item.id}>
                   <div className="text-xs text-[#8496B0]">{item.classroom.name} · {item.assignment.title}</div>
@@ -175,7 +175,7 @@ export default function Dashboard() {
         </section>
 
         <div className="grid items-start gap-6 lg:grid-cols-[1fr_360px]">
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <section className="scroll-list scroll-list-lg grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {loading ? (
               <div className="sm:col-span-2 xl:col-span-3">
                 <InlineLoading rows={3} />

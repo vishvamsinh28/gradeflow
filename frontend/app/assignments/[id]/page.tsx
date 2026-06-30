@@ -500,7 +500,7 @@ export default function AssignmentPage() {
           {loading ? (
             <InlineLoading rows={3} />
           ) : analytics?.common_errors?.length ? (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="scroll-list scroll-list-sm grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {analytics.common_errors.map((item) => (
                 <ErrorInsight
                   category={item.category}
@@ -538,7 +538,7 @@ export default function AssignmentPage() {
                 </button>
               ))}
             </div>
-            <div className="space-y-3">
+            <div className="scroll-list scroll-list-lg space-y-3">
               {filteredSubmissions.map((submission) => (
                 <div className="flex flex-col justify-between gap-4 rounded-xl border border-[#8496b01f] bg-[#0B1829] p-4 md:flex-row md:items-center" key={submission.id}>
                   <div>
@@ -599,7 +599,7 @@ export default function AssignmentPage() {
                   <h3 className="font-display font-semibold">Questions</h3>
                   <span className="font-mono text-xs text-[#8496B0]">{buildAssignmentPayload(editQuestions, editRules).totalPoints} points</span>
                 </div>
-                <div className="space-y-4">
+                <div className="scroll-list scroll-list-lg space-y-4">
                   {editQuestions.map((question, index) => (
                     <div className="rounded-xl border border-[#8496b01f] bg-[#132338] p-4" key={index}>
                       <div className="mb-3 flex items-center justify-between gap-3">
@@ -634,7 +634,7 @@ export default function AssignmentPage() {
                 <div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">History</div>
                 <h2 className="font-display text-xl font-semibold">Versions and audit</h2>
               </div>
-              <div className="space-y-3">
+              <div className="scroll-list scroll-list-sm space-y-3">
                 {history?.versions?.slice(0, 4).map((version) => (
                   <div className="rounded-xl border border-[#8496b01f] bg-[#0B1829] p-4" key={version.id}>
                     <div className="font-display text-sm font-semibold">Version {version.version_number}</div>

@@ -68,7 +68,7 @@ export default function StudentPage() {
 
         <section className={`${panelClass} mt-6`}>
           <h2 className="font-display text-2xl font-semibold">Submission history</h2>
-          <div className="mt-5 space-y-3">
+          <div className="scroll-list scroll-list-lg mt-5 space-y-3">
             {data?.submissions.map((submission) => (
               <Link className="flex flex-col justify-between gap-3 rounded-xl border border-[#8496b01f] bg-[#0B1829] p-4 transition hover:border-[#00c9a759] sm:flex-row sm:items-center" href={`/submissions/${submission.id}`} key={submission.id}>
                 <div>

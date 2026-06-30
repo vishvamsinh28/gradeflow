@@ -194,6 +194,40 @@ button {
   padding: 0 12px;
 }
 
+.scroll-list {
+  max-height: min(520px, 65svh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  scrollbar-color: rgba(132, 150, 176, 0.55) transparent;
+  scrollbar-width: thin;
+}
+
+.scroll-list-sm {
+  max-height: min(360px, 52svh);
+}
+
+.scroll-list-lg {
+  max-height: min(680px, 72svh);
+}
+
+.scroll-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scroll-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-list::-webkit-scrollbar-thumb {
+  background: rgba(132, 150, 176, 0.42);
+  border-radius: 999px;
+}
+
+.scroll-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(132, 150, 176, 0.68);
+}
+
 @media (max-width: 520px) {
   .header-nav-desktop {
     display: none;

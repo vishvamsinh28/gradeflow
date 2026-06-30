@@ -50,7 +50,7 @@ export default function StudentResultsPage({ params }: { params: Promise<{ token
         {loading && !data ? (
           <PageLoading title="Loading results" detail="Fetching returned assignments for this student link." />
         ) : (
-        <section className="mt-6 space-y-4">
+        <section className="scroll-list scroll-list-lg mt-6 space-y-4">
           {data?.submissions.map((submission) => {
             const percent = submission.score != null && submission.max_score ? Math.round((submission.score / submission.max_score) * 100) : null;
             return (

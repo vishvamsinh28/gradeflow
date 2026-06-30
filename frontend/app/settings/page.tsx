@@ -114,7 +114,7 @@ export default function SettingsPage() {
               <h2 className="font-display text-2xl font-semibold">Recent activity</h2>
               <p className="mt-1 text-sm text-[#8496B0]">A compact audit trail of teacher actions and system events.</p>
             </div>
-            <div className="space-y-3">
+            <div className="scroll-list space-y-3">
               {logs.slice(0, 12).map((log) => (
                 <div className="rounded-xl border border-[#8496b01f] bg-[#0B1829] p-4" key={log.id}>
                   <div className="font-display text-sm font-semibold text-[#E2EAF4]">{log.action.replaceAll("_", " ")}</div>

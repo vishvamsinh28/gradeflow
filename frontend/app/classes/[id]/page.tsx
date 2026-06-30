@@ -282,7 +282,7 @@ export default function ClassPage() {
                 </div>
                 <span className="rounded-full border border-[#00c9a733] bg-[#00c9a714] px-3 py-1 font-mono text-xs text-[#00C9A7]">{data?.assignments?.length ?? 0}</span>
               </div>
-              <div className="space-y-3">
+              <div className="scroll-list space-y-3">
                 {data?.assignments?.map((assignment) => (
                   <div
                     key={assignment.id}
@@ -345,7 +345,7 @@ export default function ClassPage() {
                 <textarea className={textareaClass} value={generalRules} onChange={(event) => setGeneralRules(event.target.value)} />
               </label>
 
-              <div className="mt-5 space-y-4">
+              <div className="scroll-list scroll-list-lg mt-5 space-y-4">
                 {questions.map((question, index) => (
                   <div className="rounded-xl border border-[#8496b01f] bg-[#0B1829] p-4" key={index}>
                     <div className="mb-4 flex items-center justify-between gap-3">
@@ -400,7 +400,7 @@ export default function ClassPage() {
 
             <div className={panelClass}>
               <div className="mb-4 flex items-center justify-between"><h2 className="font-display text-xl font-semibold">Students</h2><span className="font-mono text-xs text-[#8496B0]">{data?.students?.length ?? 0}</span></div>
-              <div className="space-y-2">
+              <div className="scroll-list space-y-2">
                 {data?.students?.map((student, index) => (
                   <div className="flex items-center gap-3 rounded-xl border border-[#8496b01a] bg-[#0B1829] px-3 py-3" key={student.id}>
                     <div className="grid h-8 w-8 place-items-center rounded-full bg-[#00c9a714] font-mono text-[11px] text-[#00C9A7]">{String(index + 1).padStart(2, "0")}</div>
