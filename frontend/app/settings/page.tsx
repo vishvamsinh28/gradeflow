@@ -11,6 +11,13 @@ const panelClass = "rounded-2xl border border-[#8496b01f] bg-[#132338] p-5 shado
 const inputClass = "app-input w-full rounded-xl border border-[#8496b02e] bg-[#0B1829] px-4 py-3 text-sm text-[#F8FAFC]";
 const textareaClass = "app-textarea min-h-[140px] w-full resize-none rounded-xl border border-[#8496b02e] bg-[#0B1829] px-4 py-3 text-sm leading-6 text-[#E2EAF4]";
 
+const geminiModels = [
+  { value: "gemini-3.1-flash-lite", label: "Gemini 3.1 Flash-Lite" },
+  { value: "gemini-3.5-flash", label: "Gemini 3.5 Flash" },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+  { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite" },
+];
+
 export default function SettingsPage() {
   const { notify } = useToast();
   const [settings, setSettings] = useState<TeacherSettings | null>(null);
@@ -85,7 +92,20 @@ export default function SettingsPage() {
             </div>
             <label className="block">
               <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Gemini model</span>
-              <input className={inputClass} value={settings?.gemini_model ?? ""} onChange={(event) => setSettings((current) => current ? { ...current, gemini_model: event.target.value } : current)} required />
+              <span className="app-select-wrap">
+                <select
+                  className="app-select w-full rounded-xl border border-[#8496b02e] bg-[#0B1829] px-4 py-3 pr-12 text-sm text-[#F8FAFC]"
+                  value={settings?.gemini_model ?? geminiModels[0].value}
+                  onChange={(event) => setSettings((current) => current ? { ...current, gemini_model: event.target.value } : current)}
+                  required
+                >
+                  {geminiModels.map((model) => (
+                    <option value={model.value} key={model.value}>{model.label}</option>
+                  ))}
+                </select>
+                <span className="app-select-chevron" aria-hidden="true" />
+              </span>
+              <p className="mt-2 text-xs leading-5 text-[#8496B0]">Only supported free-tier Flash and Flash-Lite models can be saved, so grading does not fail later from a typo or unavailable model.</p>
             </label>
             <label className="mt-4 block">
               <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Review threshold</span>

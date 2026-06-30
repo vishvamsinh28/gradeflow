@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
+from app.core.gemini_models import SUPPORTED_GEMINI_MODELS
+
 
 class APIModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -49,6 +51,12 @@ class TeacherSettingsUpdate(APIModel):
     default_subject: str = Field(min_length=2, max_length=80)
     default_grade_level: str | None = Field(default=None, max_length=40)
     default_grading_rules: str = Field(min_length=2, max_length=2000)
+
+    @model_validator(mode="after")
+    def model_must_be_supported(self) -> "TeacherSettingsUpdate":
+        if self.gemini_model not in SUPPORTED_GEMINI_MODELS:
+            raise ValueError("Unsupported Gemini model")
+        return self
 
 
 class AssignmentCreate(APIModel):

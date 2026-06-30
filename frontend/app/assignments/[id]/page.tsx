@@ -256,22 +256,6 @@ export default function AssignmentPage() {
     }
   }
 
-  async function updateStatus(status: string) {
-    setError("");
-    setActionId(`status-${status}`);
-    try {
-      await api(`/assignments/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
-      notify("Assignment status updated", "success");
-      await load();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Could not update assignment status";
-      setError(message);
-      notify(message, "error");
-    } finally {
-      setActionId(null);
-    }
-  }
-
   async function saveAssignment(event: FormEvent) {
     event.preventDefault();
     if (!assignment) return;
@@ -302,22 +286,6 @@ export default function AssignmentPage() {
     }
   }
 
-  async function duplicateAssignment() {
-    setError("");
-    setActionId("duplicate");
-    try {
-      const copy = await api<Assignment>(`/assignments/${id}/duplicate`, { method: "POST" });
-      notify("Assignment duplicated", "success");
-      router.push(`/assignments/${copy.id}`);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Could not duplicate assignment";
-      setError(message);
-      notify(message, "error");
-    } finally {
-      setActionId(null);
-    }
-  }
-
   async function gradeAllUngraded() {
     setError("");
     setRegrading(true);
@@ -334,31 +302,15 @@ export default function AssignmentPage() {
     }
   }
 
-  async function bulkApprove() {
-    setError("");
-    setActionId("bulk-approve");
-    try {
-      await api(`/assignments/${id}/bulk-approve`, { method: "POST" });
-      notify("Completed submissions approved", "success");
-      await load();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Could not approve completed work";
-      setError(message);
-      notify(message, "error");
-    } finally {
-      setActionId(null);
-    }
-  }
-
-  async function returnResults() {
+  async function publishResults() {
     setError("");
     setActionId("return-results");
     try {
       await api(`/assignments/${id}/return-results`, { method: "POST" });
-      notify("Results returned to student portals", "success");
+      notify("Results published to student portals", "success");
       await load();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Could not return results";
+      const message = err instanceof Error ? err.message : "Could not publish results";
       setError(message);
       notify(message, "error");
     } finally {
@@ -434,14 +386,8 @@ export default function AssignmentPage() {
             <p className="mt-3 text-[#8496B0]">{assignment?.total_points ?? 0} points · upload images or PDFs</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <span className="w-fit rounded-full border border-[#00c9a733] bg-[#00c9a714] px-3 py-1.5 text-xs font-semibold capitalize text-[#00C9A7]">{assignment?.status || "active"}</span>
-            {assignment && (
-              <>
-                <button className="app-btn app-btn-secondary" disabled={actionId === "status-active"} onClick={() => updateStatus("active")} type="button">{actionId === "status-active" ? "Opening..." : "Open grading"}</button>
-                <button className="app-btn app-btn-ghost" disabled={actionId === "return-results"} onClick={returnResults} type="button">{actionId === "return-results" ? "Returning..." : "Return results"}</button>
-                <button className="app-btn app-btn-ghost" disabled={actionId === "duplicate"} onClick={duplicateAssignment} type="button">{actionId === "duplicate" ? "Duplicating..." : "Duplicate"}</button>
-                <button className="app-btn app-btn-ghost" disabled={actionId === "status-archived"} onClick={() => updateStatus("archived")} type="button">{actionId === "status-archived" ? "Archiving..." : "Archive"}</button>
-              </>
+            {assignment?.status === "returned" && (
+              <span className="w-fit rounded-full border border-[#00c9a733] bg-[#00c9a714] px-3 py-1.5 text-xs font-semibold text-[#00C9A7]">Published</span>
             )}
             {assignment && (
               <button
@@ -474,11 +420,11 @@ export default function AssignmentPage() {
             <div>
               <div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">Workflow queue</div>
               <h2 className="font-display text-2xl font-semibold">Next actions</h2>
-              <p className="mt-1 text-sm leading-6 text-[#8496B0]">Grade new uploads, review uncertain work, then return results when you are ready.</p>
+              <p className="mt-1 text-sm leading-6 text-[#8496B0]">Grade new uploads, review uncertain work, then publish results when you are ready.</p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <button className="app-btn app-btn-secondary" disabled={!ungradedCount || Boolean(gradingId) || regrading} onClick={gradeAllUngraded} type="button">{regrading ? "Queueing..." : `Grade ${ungradedCount || "all"} ungraded`}</button>
-              <button className="app-btn app-btn-primary" disabled={!submissions.length || Boolean(reviewCount) || actionId === "bulk-approve"} onClick={bulkApprove} type="button">{actionId === "bulk-approve" ? "Approving..." : "Approve completed"}</button>
+              <button className="app-btn app-btn-primary" disabled={!ungradedCount || Boolean(gradingId) || regrading} onClick={gradeAllUngraded} type="button">{regrading ? "Queueing..." : `Grade ${ungradedCount || "submissions"}`}</button>
+              <button className="app-btn app-btn-secondary" disabled={!submissions.length || Boolean(reviewCount) || assignment?.status === "returned" || actionId === "return-results"} onClick={publishResults} type="button">{assignment?.status === "returned" ? "Published" : actionId === "return-results" ? "Publishing..." : "Publish to students"}</button>
               <button className="app-btn app-btn-ghost" disabled={!submissions.length} onClick={exportCsv} type="button">Export CSV</button>
             </div>
           </div>

@@ -104,7 +104,7 @@ export default function Home() {
             <WorkflowStep number="02" title="Batch upload" text="Upload images or PDFs and assign by student name as you go." />
             <WorkflowStep number="03" title="Review exceptions" text="Low-confidence work lands in a dedicated teacher review queue." />
             <WorkflowStep number="04" title="Regrade safely" text="Version rubric edits, regrade all submissions, and keep an audit trail." />
-            <WorkflowStep number="05" title="Return results" text="Release completed grades to each student's secure results link." />
+            <WorkflowStep number="05" title="Publish to students" text="Release completed grades to each student's secure results link." />
           </div>
         </div>
       </section>

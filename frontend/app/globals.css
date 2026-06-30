@@ -363,7 +363,29 @@ button {
 }
 
 .app-select {
+  appearance: none;
   color-scheme: dark;
+}
+
+.app-select-wrap {
+  display: block;
+  position: relative;
+}
+
+.app-select-chevron {
+  border-bottom: 2px solid rgba(226, 234, 244, 0.9);
+  border-right: 2px solid rgba(226, 234, 244, 0.9);
+  height: 9px;
+  pointer-events: none;
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-65%) rotate(45deg);
+  width: 9px;
+}
+
+.app-select-wrap:focus-within .app-select-chevron {
+  border-color: var(--teal);
 }
 
 .app-select option {

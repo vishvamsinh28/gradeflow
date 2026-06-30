@@ -293,7 +293,9 @@ export default function ClassPage() {
                       <div className="mt-1 text-xs text-[#8496B0]">{assignment.total_points} points</div>
                     </Link>
                     <div className="flex items-center gap-3">
-                      <span className="rounded-full bg-[#00c9a714] px-2.5 py-1 text-[11px] font-semibold capitalize text-[#00C9A7]">{assignment.status}</span>
+                      {assignment.status === "returned" && (
+                        <span className="rounded-full bg-[#00c9a714] px-2.5 py-1 text-[11px] font-semibold text-[#00C9A7]">Published</span>
+                      )}
                       <button
                         className="app-btn app-btn-danger app-btn-sm"
                         disabled={actionId === `delete-assignment-${assignment.id}`}

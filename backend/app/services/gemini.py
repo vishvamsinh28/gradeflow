@@ -5,13 +5,14 @@ from google import genai
 from google.genai import types
 
 from app.core.config import get_settings
+from app.core.gemini_models import resolve_gemini_model
 from app.models.schemas import ExtractionResult, GradingResult
 
 
 class GeminiGrader:
     def __init__(self, model: str | None = None) -> None:
         self.settings = get_settings()
-        self.model = model or self.settings.gemini_model
+        self.model = resolve_gemini_model(model)
         self.client = genai.Client(api_key=self.settings.gemini_api_key)
 
     def _json_response(self, contents: list[Any]) -> dict[str, Any]:

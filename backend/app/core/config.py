@@ -28,7 +28,6 @@ class Settings(BaseSettings):
     cookie_samesite: Literal["lax", "strict", "none"] = "lax"
 
     gemini_api_key: str
-    gemini_model: str = "gemini-3.1-flash-lite"
     grading_confidence_threshold: float = Field(default=0.72, ge=0, le=1)
     frontend_origins: str | None = None
 
