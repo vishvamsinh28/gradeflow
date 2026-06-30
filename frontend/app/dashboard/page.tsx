@@ -244,6 +244,7 @@ export default function Dashboard() {
   );
 }
 
+
 function MiniMetric({ value, label, tone = "teal" }: { value: number; label: string; tone?: "teal" | "amber" }) {
   return (
     <div className="rounded-xl border border-[#8496b01f] bg-[#132338] px-4 py-3 text-sm text-[#E2EAF4]">
