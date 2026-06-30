@@ -34,7 +34,12 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (token && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${token}`);
   }
-  const response = await fetch(`${API_URL}${path}`, {
+  const method = init.method?.toUpperCase() ?? "GET";
+  const url = new URL(`${API_URL}${path}`);
+  if (method === "GET") {
+    url.searchParams.set("_", String(Date.now()));
+  }
+  const response = await fetch(url.toString(), {
     ...init,
     headers,
     credentials: "include",
