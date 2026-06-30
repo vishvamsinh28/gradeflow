@@ -34,7 +34,7 @@ type AssignmentHistory = {
 
 const panelClass = "rounded-2xl border border-[#8496b01f] bg-[#132338] p-5 shadow-[0_18px_48px_rgba(0,0,0,.12)] sm:p-6";
 const inputClass = "app-input w-full rounded-xl border border-[#8496b02e] bg-[#0B1829] px-4 py-3 text-sm text-[#F8FAFC]";
-const textareaClass = "app-textarea min-h-[96px] w-full resize-y rounded-xl border border-[#8496b02e] bg-[#0B1829] px-4 py-3 text-sm leading-6 text-[#E2EAF4]";
+const textareaClass = "app-textarea min-h-[96px] w-full resize-none rounded-xl border border-[#8496b02e] bg-[#0B1829] px-4 py-3 text-sm leading-6 text-[#E2EAF4]";
 
 function questionsFromAssignment(assignment: Assignment): QuestionDraft[] {
   const answerQuestions = (assignment.answer_key?.questions as Record<string, unknown>[] | undefined) ?? [];
@@ -606,7 +606,7 @@ export default function AssignmentPage() {
                         <span className="font-display text-sm font-semibold">Question {index + 1}</span>
                         <button className="app-btn app-btn-danger app-btn-sm" onClick={() => removeEditQuestion(index)} type="button">Remove</button>
                       </div>
-                      <div className="grid gap-3 sm:grid-cols-[80px_1fr_90px]">
+                      <div className="grid items-start gap-3 sm:grid-cols-[112px_minmax(0,1fr)_132px]">
                         <input className={inputClass} value={question.number} onChange={(event) => updateEditQuestion(index, { number: event.target.value })} required />
                         <textarea className={textareaClass} value={question.prompt} onChange={(event) => updateEditQuestion(index, { prompt: event.target.value })} placeholder="Question prompt" required />
                         <input className={inputClass} min="0.5" step="0.5" type="number" value={question.maxScore} onChange={(event) => updateEditQuestion(index, { maxScore: event.target.value })} required />

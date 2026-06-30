@@ -29,7 +29,7 @@ const newQuestion = (number = "1"): QuestionDraft => ({
 });
 
 const inputClass = "app-input w-full rounded-xl border border-[#8496b02e] bg-[#0B1829] px-4 py-3 text-sm text-[#F8FAFC]";
-const textareaClass = "app-textarea min-h-[96px] w-full resize-y rounded-xl border border-[#8496b02e] bg-[#0B1829] px-4 py-3 text-sm leading-6 text-[#E2EAF4]";
+const textareaClass = "app-textarea min-h-[96px] w-full resize-none rounded-xl border border-[#8496b02e] bg-[#0B1829] px-4 py-3 text-sm leading-6 text-[#E2EAF4]";
 const panelClass = "rounded-2xl border border-[#8496b01f] bg-[#132338] p-5 shadow-[0_18px_48px_rgba(0,0,0,.12)] sm:p-6";
 
 export default function ClassPage() {
@@ -315,7 +315,7 @@ export default function ClassPage() {
                 <h2 className="font-display text-2xl font-semibold">Create assignment</h2>
                 <p className="mt-1 text-sm text-[#8496B0]">Paste the assignment instructions, question, full solution, rubric, and likely mistakes in plain language.</p>
               </div>
-              <div className="grid gap-4 sm:grid-cols-[1fr_220px]">
+              <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
                 <label className="block">
                   <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Title</span>
                   <input className={inputClass} required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Linear equations quiz" />
@@ -352,7 +352,7 @@ export default function ClassPage() {
                       <h3 className="font-display font-semibold">Question {index + 1}</h3>
                       <button className="app-btn app-btn-danger app-btn-sm" onClick={() => removeQuestion(index)} type="button">Remove</button>
                     </div>
-                    <div className="grid gap-4 sm:grid-cols-[100px_1fr_140px]">
+                    <div className="grid items-start gap-4 sm:grid-cols-[132px_minmax(0,1fr)_180px]">
                       <label className="block">
                         <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">No.</span>
                         <input className={inputClass} required value={question.number} onChange={(event) => updateQuestion(index, { number: event.target.value })} />
