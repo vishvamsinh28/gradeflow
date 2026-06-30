@@ -128,15 +128,27 @@ def approve_submission(
     db: Client = Depends(get_supabase),
 ):
     owned_submission(db, submission_id, user["id"])
+    question_results = (
+        db.table("grading_results")
+        .select("score,max_score")
+        .eq("submission_id", submission_id)
+        .execute()
+        .data
+    )
+    ai_score = sum(float(result.get("score") or 0) for result in question_results) if question_results else None
+    ai_max_score = sum(float(result.get("max_score") or 0) for result in question_results) if question_results else None
     now = datetime.now(timezone.utc).isoformat()
-    response = db.table("submissions").update(
-        {
+    update = {
             "status": "completed",
             "review_required": False,
             "reviewed_at": now,
             "updated_at": now,
         }
-    ).eq("id", submission_id).execute()
+    if ai_score is not None:
+        update["score"] = ai_score
+    if ai_max_score is not None:
+        update["max_score"] = ai_max_score
+    response = db.table("submissions").update(update).eq("id", submission_id).execute()
     log_audit(
         db,
         owner_id=user["id"],

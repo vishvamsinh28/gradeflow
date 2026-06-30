@@ -24,7 +24,7 @@ export default function SubmissionPage() {
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [reviewAction, setReviewAction] = useState<"save" | "approve" | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   async function load() {
@@ -49,7 +49,7 @@ export default function SubmissionPage() {
 
   async function review(event: FormEvent) {
     event.preventDefault();
-    setSaving(true);
+    setReviewAction("save");
     setError("");
     try {
       await api(`/submissions/${id}/review`, {
@@ -63,23 +63,25 @@ export default function SubmissionPage() {
       setError(message);
       notify(message, "error");
     } finally {
-      setSaving(false);
+      setReviewAction(null);
     }
   }
 
   async function approveAsIs() {
-    setSaving(true);
+    setReviewAction("approve");
     setError("");
     try {
-      await api(`/submissions/${id}/approve`, { method: "POST" });
-      notify("Submission approved", "success");
+      const approved = await api<Submission>(`/submissions/${id}/approve`, { method: "POST" });
+      setScore(String(approved.score ?? ""));
+      setNote(approved.feedback?.teacher_note ?? "");
+      notify("AI score approved", "success");
       await load();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Approval failed";
       setError(message);
       notify(message, "error");
     } finally {
-      setSaving(false);
+      setReviewAction(null);
     }
   }
 
@@ -208,7 +210,7 @@ export default function SubmissionPage() {
             </div>
 
             <form className={panelClass} onSubmit={review}>
-              <div className="mb-5"><div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">Human in the loop</div><h2 className="font-display text-xl font-semibold">Teacher review</h2><p className="mt-1 text-xs leading-5 text-[#8496B0]">Override the score or leave a final note before approval.</p></div>
+              <div className="mb-5"><div className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#00C9A7]">Human in the loop</div><h2 className="font-display text-xl font-semibold">Teacher review</h2><p className="mt-1 text-xs leading-5 text-[#8496B0]">Save changes when you edit the score or note. Approve AI score when it already looks right.</p></div>
               <label className="block">
                 <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-[#8496B0]">Final score</span>
                 <input className={inputClass} type="number" min="0" max={data?.max_score} onWheel={(event) => event.currentTarget.blur()} step="0.5" value={score} onChange={(event) => setScore(event.target.value)} required />
@@ -218,8 +220,8 @@ export default function SubmissionPage() {
                 <textarea className={textareaClass} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional note for the student" />
               </label>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <button disabled={saving} className="app-btn app-btn-primary app-btn-full app-btn-lg" type="submit">{saving ? "Saving..." : "Save review"}</button>
-                <button disabled={saving} className="app-btn app-btn-secondary app-btn-full app-btn-lg" onClick={approveAsIs} type="button">{saving ? "Approving..." : "Approve as-is"}</button>
+                <button disabled={reviewAction !== null} className="app-btn app-btn-primary app-btn-full app-btn-lg" type="submit">{reviewAction === "save" ? "Saving..." : "Save changes"}</button>
+                <button disabled={reviewAction !== null} className="app-btn app-btn-secondary app-btn-full app-btn-lg" onClick={approveAsIs} type="button">{reviewAction === "approve" ? "Approving..." : "Approve AI score"}</button>
               </div>
             </form>
           </aside>
