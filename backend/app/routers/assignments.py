@@ -19,8 +19,27 @@ def return_blocking_submissions(submissions: list[dict]) -> list[dict]:
     return [
         submission
         for submission in submissions
-        if submission.get("status") != "completed" or submission.get("review_required")
+        if submission.get("status") != "completed"
+        or submission.get("review_required")
+        or submission.get("score") is None
+        or submission.get("max_score") is None
     ]
+
+
+def ensure_assignment_can_return(db: Client, assignment_id: str) -> None:
+    submissions = (
+        db.table("submissions")
+        .select("id,status,review_required,score,max_score")
+        .eq("assignment_id", assignment_id)
+        .execute()
+        .data
+    )
+    blockers = return_blocking_submissions(submissions)
+    if blockers:
+        raise HTTPException(
+            status_code=400,
+            detail="Complete, score, and resolve every submission before returning results",
+        )
 
 
 def run_assignment_regrade_job(assignment_id: str, owner_id: str, submission_ids: list[str]) -> None:
@@ -77,6 +96,8 @@ def update_assignment_status(
     db: Client = Depends(get_supabase),
 ):
     owned_assignment(db, assignment_id, user["id"])
+    if payload.status == "returned":
+        ensure_assignment_can_return(db, assignment_id)
     response = db.table("assignments").update({"status": payload.status}).eq("id", assignment_id).execute()
     log_audit(
         db,
@@ -230,19 +251,7 @@ def return_assignment_results(
     db: Client = Depends(get_supabase),
 ):
     owned_assignment(db, assignment_id, user["id"])
-    submissions = (
-        db.table("submissions")
-        .select("id,status,review_required")
-        .eq("assignment_id", assignment_id)
-        .execute()
-        .data
-    )
-    blockers = return_blocking_submissions(submissions)
-    if blockers:
-        raise HTTPException(
-            status_code=400,
-            detail="Complete or resolve every submission before returning results",
-        )
+    ensure_assignment_can_return(db, assignment_id)
     response = db.table("assignments").update({"status": "returned"}).eq("id", assignment_id).execute()
     log_audit(
         db,

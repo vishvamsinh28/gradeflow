@@ -48,7 +48,7 @@ def returned_results(portal_token: str, db: Client = Depends(get_supabase)):
     assignment_by_id = {assignment["id"]: assignment for assignment in assignments}
     submissions = (
         db.table("submissions")
-        .select("id,assignment_id,original_filename,status,score,max_score,feedback,confidence,reviewed_at,created_at")
+        .select("id,assignment_id,status,score,max_score,feedback,confidence,reviewed_at,created_at")
         .eq("student_id", student["id"])
         .in_("assignment_id", list(assignment_by_id))
         .order("created_at", desc=True)

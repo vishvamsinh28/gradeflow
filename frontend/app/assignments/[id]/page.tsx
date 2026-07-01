@@ -194,6 +194,13 @@ export default function AssignmentPage() {
   const filteredSubmissions = submissions.filter((submission) => statusFilter === "all" || submission.status === statusFilter);
   const reviewCount = submissions.filter((submission) => submission.review_required || submission.status === "review_required").length;
   const ungradedCount = submissions.filter((submission) => submission.status === "uploaded" || submission.status === "failed").length;
+  const publishBlockerCount = submissions.filter(
+    (submission) =>
+      submission.status !== "completed" ||
+      submission.review_required ||
+      submission.score == null ||
+      submission.max_score == null
+  ).length;
 
   async function grade(submissionId: string) {
     setError("");
@@ -424,7 +431,7 @@ export default function AssignmentPage() {
             </div>
             <div className="flex flex-wrap gap-3">
               <button className="app-btn app-btn-primary" disabled={!ungradedCount || Boolean(gradingId) || regrading} onClick={gradeAllUngraded} type="button">{regrading ? "Queueing..." : `Grade ${ungradedCount || "submissions"}`}</button>
-              <button className="app-btn app-btn-secondary" disabled={!submissions.length || Boolean(reviewCount) || assignment?.status === "returned" || actionId === "return-results"} onClick={publishResults} type="button">{assignment?.status === "returned" ? "Published" : actionId === "return-results" ? "Publishing..." : "Publish to students"}</button>
+              <button className="app-btn app-btn-secondary" disabled={!submissions.length || Boolean(publishBlockerCount) || assignment?.status === "returned" || actionId === "return-results"} onClick={publishResults} type="button">{assignment?.status === "returned" ? "Published" : actionId === "return-results" ? "Publishing..." : "Publish to students"}</button>
               <button className="app-btn app-btn-ghost" disabled={!submissions.length} onClick={exportCsv} type="button">Export CSV</button>
             </div>
           </div>

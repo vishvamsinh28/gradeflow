@@ -15,6 +15,16 @@ router = APIRouter(prefix="/submissions", tags=["submissions"])
 logger = logging.getLogger(__name__)
 
 
+def approved_ai_totals(question_results: list[dict]) -> tuple[float, float]:
+    if not question_results:
+        raise HTTPException(status_code=400, detail="Grade the submission before approving it")
+    ai_score = sum(float(result.get("score") or 0) for result in question_results)
+    ai_max_score = sum(float(result.get("max_score") or 0) for result in question_results)
+    if ai_max_score <= 0:
+        raise HTTPException(status_code=400, detail="Cannot approve a submission without a score maximum")
+    return ai_score, ai_max_score
+
+
 def run_grading_job(submission_id: str, owner_id: str, assignment_id: str) -> None:
     db = get_supabase()
     try:
@@ -135,19 +145,16 @@ def approve_submission(
         .execute()
         .data
     )
-    ai_score = sum(float(result.get("score") or 0) for result in question_results) if question_results else None
-    ai_max_score = sum(float(result.get("max_score") or 0) for result in question_results) if question_results else None
+    ai_score, ai_max_score = approved_ai_totals(question_results)
     now = datetime.now(timezone.utc).isoformat()
     update = {
             "status": "completed",
             "review_required": False,
             "reviewed_at": now,
             "updated_at": now,
+            "score": ai_score,
+            "max_score": ai_max_score,
         }
-    if ai_score is not None:
-        update["score"] = ai_score
-    if ai_max_score is not None:
-        update["max_score"] = ai_max_score
     response = db.table("submissions").update(update).eq("id", submission_id).execute()
     log_audit(
         db,
