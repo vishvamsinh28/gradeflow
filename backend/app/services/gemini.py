@@ -9,6 +9,46 @@ from app.core.gemini_models import resolve_gemini_model
 from app.models.schemas import ExtractionResult, GradingResult
 
 
+def normalize_grading_payload(data: dict[str, Any], total_points: float) -> dict[str, Any]:
+    total_points = max(0, float(total_points))
+    questions = data.get("questions") or []
+    normalized_questions: list[dict[str, Any]] = []
+
+    for question in questions:
+        normalized = dict(question)
+        max_score = max(0, float(normalized.get("max_score") or 0))
+        score = max(0, float(normalized.get("score") or 0))
+        normalized["max_score"] = max_score
+        normalized["score"] = min(score, max_score)
+        normalized_questions.append(normalized)
+
+    if normalized_questions:
+        question_max = sum(question["max_score"] for question in normalized_questions)
+        if question_max > 0:
+            scale = total_points / question_max
+            for question in normalized_questions:
+                question["max_score"] *= scale
+                question["score"] = min(question["score"] * scale, question["max_score"])
+        elif total_points > 0:
+            per_question_max = total_points / len(normalized_questions)
+            for question in normalized_questions:
+                question["max_score"] = per_question_max
+                question["score"] = 0
+
+        return {
+            **data,
+            "questions": normalized_questions,
+            "score": sum(question["score"] for question in normalized_questions),
+            "max_score": sum(question["max_score"] for question in normalized_questions),
+        }
+
+    return {
+        **data,
+        "score": max(0, min(float(data.get("score") or 0), total_points)),
+        "max_score": total_points,
+    }
+
+
 class GeminiGrader:
     def __init__(self, model: str | None = None) -> None:
         self.settings = get_settings()
@@ -117,7 +157,4 @@ Keep feedback concise, specific, and suitable for a teacher to review.
                 )
             ]
         )
-        result = GradingResult.model_validate(data)
-        result.score = max(0, min(result.score, total_points))
-        result.max_score = total_points
-        return result
+        return GradingResult.model_validate(normalize_grading_payload(data, total_points))

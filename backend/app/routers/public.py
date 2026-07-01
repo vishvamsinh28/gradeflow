@@ -6,11 +6,26 @@ from app.db.supabase import get_supabase
 router = APIRouter(prefix="/public", tags=["public"])
 
 
+def public_student_payload(student: dict) -> dict:
+    return {"name": student["name"]}
+
+
+def public_classroom_payload(student: dict) -> dict | None:
+    classroom = student.get("classes")
+    if not classroom:
+        return None
+    return {
+        "name": classroom["name"],
+        "subject": classroom["subject"],
+        "grade_level": classroom.get("grade_level"),
+    }
+
+
 @router.get("/results/{portal_token}")
 def returned_results(portal_token: str, db: Client = Depends(get_supabase)):
     student_response = (
         db.table("students")
-        .select("id,name,external_id,portal_token,class_id,classes(id,name,subject,grade_level)")
+        .select("id,name,class_id,classes(name,subject,grade_level)")
         .eq("portal_token", portal_token)
         .limit(1)
         .execute()
@@ -18,6 +33,8 @@ def returned_results(portal_token: str, db: Client = Depends(get_supabase)):
     if not student_response.data:
         raise HTTPException(status_code=404, detail="Results link not found")
     student = student_response.data[0]
+    public_student = public_student_payload(student)
+    public_classroom = public_classroom_payload(student)
     assignments = (
         db.table("assignments")
         .select("id,title,total_points,status,created_at")
@@ -27,7 +44,7 @@ def returned_results(portal_token: str, db: Client = Depends(get_supabase)):
         .data
     )
     if not assignments:
-        return {"student": student, "classroom": student.get("classes"), "submissions": []}
+        return {"student": public_student, "classroom": public_classroom, "submissions": []}
     assignment_by_id = {assignment["id"]: assignment for assignment in assignments}
     submissions = (
         db.table("submissions")
@@ -39,8 +56,8 @@ def returned_results(portal_token: str, db: Client = Depends(get_supabase)):
         .data
     )
     return {
-        "student": student,
-        "classroom": student.get("classes"),
+        "student": public_student,
+        "classroom": public_classroom,
         "submissions": [
             {**submission, "assignment": assignment_by_id.get(submission["assignment_id"])}
             for submission in submissions

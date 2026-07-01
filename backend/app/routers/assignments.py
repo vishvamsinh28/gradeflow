@@ -15,6 +15,14 @@ router = APIRouter(tags=["assignments"])
 logger = logging.getLogger(__name__)
 
 
+def return_blocking_submissions(submissions: list[dict]) -> list[dict]:
+    return [
+        submission
+        for submission in submissions
+        if submission.get("status") != "completed" or submission.get("review_required")
+    ]
+
+
 def run_assignment_regrade_job(assignment_id: str, owner_id: str, submission_ids: list[str]) -> None:
     db = get_supabase()
     workflow = GradingWorkflow(db)
@@ -222,17 +230,19 @@ def return_assignment_results(
     db: Client = Depends(get_supabase),
 ):
     owned_assignment(db, assignment_id, user["id"])
-    pending_reviews = (
+    submissions = (
         db.table("submissions")
-        .select("id")
+        .select("id,status,review_required")
         .eq("assignment_id", assignment_id)
-        .eq("review_required", True)
-        .limit(1)
         .execute()
         .data
     )
-    if pending_reviews:
-        raise HTTPException(status_code=400, detail="Resolve review-required submissions before returning results")
+    blockers = return_blocking_submissions(submissions)
+    if blockers:
+        raise HTTPException(
+            status_code=400,
+            detail="Complete or resolve every submission before returning results",
+        )
     response = db.table("assignments").update({"status": "returned"}).eq("id", assignment_id).execute()
     log_audit(
         db,
