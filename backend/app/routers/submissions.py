@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
 import logging
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from supabase import Client
@@ -124,7 +124,7 @@ def grade_submission(
         {
             "status": "processing",
             "error_message": None,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
         }
     ).eq("id", submission_id).execute()
     background_tasks.add_task(run_grading_job, submission_id, user["id"], submission["assignment_id"])
@@ -146,7 +146,7 @@ def approve_submission(
         .data
     )
     ai_score, ai_max_score = approved_ai_totals(question_results)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     update = {
             "status": "completed",
             "review_required": False,
@@ -188,8 +188,8 @@ def review_submission(
             "feedback": feedback,
             "status": "completed",
             "review_required": False,
-            "reviewed_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "reviewed_at": datetime.now(UTC).isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
         }
     ).eq("id", submission_id).execute()
     log_audit(

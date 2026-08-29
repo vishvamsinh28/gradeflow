@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import bcrypt
@@ -23,7 +23,7 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 def create_access_token(subject: str, extra: dict[str, Any] | None = None) -> str:
     settings = get_settings()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "sub": subject,
         "iat": now,

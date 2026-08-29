@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from langgraph.graph import END, START, StateGraph
@@ -186,7 +186,7 @@ class GradingWorkflow:
                     "confidence": state["confidence"],
                     "review_required": state["review_required"],
                     "error_message": None,
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(UTC).isoformat(),
                 }
             ).eq("id", submission_id).execute()
         except Exception:
@@ -209,7 +209,7 @@ class GradingWorkflow:
             {
                 "status": "processing",
                 "error_message": None,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(UTC).isoformat(),
             }
         ).eq("id", submission_id).execute()
         try:
@@ -219,7 +219,7 @@ class GradingWorkflow:
                 {
                     "status": "failed",
                     "error_message": "Grading failed. Please retry or review the submission manually.",
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(UTC).isoformat(),
                 }
             ).eq("id", submission_id).execute()
             raise

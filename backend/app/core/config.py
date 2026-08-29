@@ -1,5 +1,4 @@
 from functools import lru_cache
-
 from typing import Literal
 
 from pydantic import AliasChoices, Field, model_validator
@@ -21,7 +20,7 @@ class Settings(BaseSettings):
     supabase_storage_bucket: str = "submissions"
     db_url: str | None = None
 
-    jwt_secret: str = Field(min_length=24)
+    jwt_secret: str = Field(min_length=32)
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7
     cookie_secure: bool = False

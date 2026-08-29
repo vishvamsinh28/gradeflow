@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
-from app.routers import analytics, assignments, auth, classes, public, settings as settings_router, submissions
+from app.routers import analytics, assignments, auth, classes, public, submissions
+from app.routers import settings as settings_router
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name, version="0.1.0")

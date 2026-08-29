@@ -63,7 +63,7 @@ from app.core.config import get_settings
 
 get_settings()
 PY
-) || fail "backend/.env is invalid. Check required Supabase, Gemini and JWT values. JWT_SECRET must be at least 24 characters."
+) || fail "backend/.env is invalid. Check required Supabase, Gemini and JWT values. JWT_SECRET must be at least 32 characters."
 
 trap 'cleanup; exit 0' INT TERM
 trap cleanup EXIT

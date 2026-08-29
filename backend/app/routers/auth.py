@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from postgrest.exceptions import APIError
@@ -39,7 +39,7 @@ def set_auth_cookie(response: Response, token: str) -> None:
         secure=settings.cookie_secure,
         samesite=settings.cookie_samesite,
         max_age=max_age,
-        expires=datetime.now(timezone.utc) + timedelta(seconds=max_age),
+        expires=datetime.now(UTC) + timedelta(seconds=max_age),
         path="/",
     )
 

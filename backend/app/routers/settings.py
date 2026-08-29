@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends
 from supabase import Client
@@ -40,7 +40,7 @@ def update_settings(
     get_or_create_settings(db, user["id"])
     update = {
         **payload.model_dump(),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
     }
     response = db.table("teacher_settings").update(update).eq("user_id", user["id"]).execute()
     log_audit(

@@ -1,7 +1,16 @@
-from datetime import datetime, timezone
 import logging
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+    status,
+)
 from supabase import Client
 
 from app.db.supabase import get_supabase
@@ -223,7 +232,7 @@ def bulk_approve_assignment(
     db: Client = Depends(get_supabase),
 ):
     owned_assignment(db, assignment_id, user["id"])
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     response = (
         db.table("submissions")
         .update({"status": "completed", "review_required": False, "reviewed_at": now, "updated_at": now})
@@ -282,7 +291,7 @@ def regrade_assignment(
         .data
     )
     submission_ids = [submission["id"] for submission in submissions]
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     if submission_ids:
         db.table("submissions").update(
             {"status": "processing", "error_message": None, "updated_at": now}
@@ -317,7 +326,7 @@ def grade_ungraded_assignment(
         .data
     )
     submission_ids = [submission["id"] for submission in submissions]
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     if submission_ids:
         db.table("submissions").update(
             {"status": "processing", "error_message": None, "updated_at": now}

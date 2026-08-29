@@ -5,8 +5,13 @@ os.environ.setdefault("SUPABASE_SECRET_KEY", "test-key")
 os.environ.setdefault("JWT_SECRET", "a-test-secret-that-is-long-enough")
 os.environ.setdefault("GEMINI_API_KEY", "test-key")
 
-from app.core.security import create_access_token, decode_access_token, hash_password, verify_password
 from app.core.config import Settings
+from app.core.security import (
+    create_access_token,
+    decode_access_token,
+    hash_password,
+    verify_password,
+)
 
 
 def test_password_round_trip():

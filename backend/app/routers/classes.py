@@ -62,6 +62,7 @@ def delete_class(class_id: str, user=Depends(get_current_user), db: Client = Dep
     owned_class(db, class_id, user["id"])
     assignments = db.table("assignments").select("id").eq("class_id", class_id).execute().data
     assignment_ids = [assignment["id"] for assignment in assignments]
+    submissions: list[dict] = []
     if assignment_ids:
         submissions = (
             db.table("submissions")

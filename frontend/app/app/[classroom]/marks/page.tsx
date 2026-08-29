@@ -402,7 +402,11 @@ export default function MarksPage() {
               <tfoot>
                 <tr>
                   <td className="sticky bottom-0 left-0 z-30 border-r border-t border-line bg-surface-2 py-2 pl-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink-3">
-                    Class average
+                    {/* The row averages what is on screen, so it must not claim
+                        to be the class average while a filter is narrowing it. */}
+                    {visible.length === rows.length
+                      ? "Class average"
+                      : `Average of ${visible.length} shown`}
                   </td>
                   <td className="sticky bottom-0 z-20 border-t border-line bg-surface-2" />
                   {columns.map((column) => (

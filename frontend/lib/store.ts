@@ -392,11 +392,14 @@ export function attachSubmissions(
   testId: ID,
   entries: { studentId: ID; fileName: string; matchedByAI?: boolean }[],
 ) {
+  // Two files can be matched to the same student. One student has one answer
+  // sheet per test, so the last match wins rather than creating a duplicate
+  // submission that would double-count in progress and grade twice.
   const byStudent = new Map(entries.map((entry) => [entry.studentId, entry]));
   const kept = state.submissions.filter(
     (submission) => !(submission.testId === testId && byStudent.has(submission.studentId)),
   );
-  const added: Submission[] = entries.map((entry) => ({
+  const added: Submission[] = [...byStudent.values()].map((entry) => ({
     id: uid("sub"),
     testId,
     studentId: entry.studentId,
@@ -447,6 +450,13 @@ function patchSubmission(id: ID, patch: Partial<Submission>) {
   });
 }
 
+/** Resolves a test from current state, or null if it has since been deleted. */
+function liveTest(classroomId: ID, testId: ID) {
+  const classroom = state.classrooms.find((item) => item.id === classroomId);
+  const test = classroom?.tests.find((item) => item.id === testId);
+  return classroom && test ? { classroom, test } : null;
+}
+
 /**
  * Grades every ungraded submission on a test, one at a time, so the teacher
  * watches real progress instead of a spinner. Safe to call twice.
@@ -455,8 +465,7 @@ export async function startGrading(classroomId: ID, testId: ID): Promise<void> {
   if (running.has(testId)) return;
 
   const classroom = state.classrooms.find((item) => item.id === classroomId);
-  const test = classroom?.tests.find((item) => item.id === testId);
-  if (!classroom || !test) return;
+  if (!classroom?.tests.some((item) => item.id === testId)) return;
 
   const order = new Map(classroom.students.map((student, index) => [student.id, index]));
   const pending = state.submissions
@@ -469,6 +478,12 @@ export async function startGrading(classroomId: ID, testId: ID): Promise<void> {
 
   if (pending.length === 0) return;
 
+  /* Grading writes into whichever account is loaded. If that changes while the
+     batch runs — the teacher signs out, or another one signs in — every
+     remaining write belongs to nobody, so stop instead of writing into the
+     wrong workspace. */
+  const owner = activeUserId;
+
   running.add(testId);
   updateTest(classroomId, testId, { status: "grading" });
   commit({
@@ -480,40 +495,56 @@ export async function startGrading(classroomId: ID, testId: ID): Promise<void> {
     ),
   });
 
-  for (const item of pending) {
-    if (!state.submissions.some((submission) => submission.id === item.id)) continue;
-    patchSubmission(item.id, { status: "grading" });
-    await new Promise((resolve) => setTimeout(resolve, 420 + (pending.length > 12 ? 120 : 380)));
+  try {
+    for (const item of pending) {
+      if (activeUserId !== owner) return;
 
-    const student = classroom.students.find((candidate) => candidate.id === item.studentId);
-    if (!student) continue;
+      // Re-read every iteration: the test can be edited or deleted mid-batch.
+      const live = liveTest(classroomId, testId);
+      if (!live) return;
+      if (!state.submissions.some((submission) => submission.id === item.id)) continue;
 
-    try {
-      const outcome = await gradeSubmission({
-        testId,
-        student,
-        maxMarks: test.maxMarks,
-        instructions: test.instructions,
-      });
-      patchSubmission(item.id, {
-        status: "graded",
-        score: outcome.score,
-        outOf: outcome.outOf,
-        summary: outcome.summary,
-        questions: outcome.questions,
-        needsReview: outcome.needsReview,
-        gradedAt: todayISO(),
-      });
-    } catch {
-      patchSubmission(item.id, { status: "failed", error: "Could not read this answer sheet." });
+      const student = live.classroom.students.find(
+        (candidate) => candidate.id === item.studentId,
+      );
+      if (!student) continue;
+
+      patchSubmission(item.id, { status: "grading" });
+      await new Promise((resolve) => setTimeout(resolve, pending.length > 12 ? 540 : 800));
+      if (activeUserId !== owner || !liveTest(classroomId, testId)) return;
+
+      try {
+        const outcome = await gradeSubmission({
+          testId,
+          student,
+          maxMarks: live.test.maxMarks,
+          instructions: live.test.instructions,
+        });
+        patchSubmission(item.id, {
+          status: "graded",
+          score: outcome.score,
+          outOf: outcome.outOf,
+          summary: outcome.summary,
+          questions: outcome.questions,
+          needsReview: outcome.needsReview,
+          gradedAt: todayISO(),
+        });
+      } catch {
+        patchSubmission(item.id, { status: "failed", error: "Could not read this answer sheet." });
+      }
+    }
+  } finally {
+    /* Always settle: without this a thrown error would leave the test stuck on
+       "grading" forever, and its id stuck in `running` so it could never be
+       retried without a reload. */
+    running.delete(testId);
+    if (activeUserId === owner && liveTest(classroomId, testId)) {
+      const remaining = state.submissions.some(
+        (submission) => submission.testId === testId && submission.status !== "graded",
+      );
+      updateTest(classroomId, testId, { status: remaining ? "collecting" : "graded" });
     }
   }
-
-  running.delete(testId);
-  const remaining = state.submissions.some(
-    (submission) => submission.testId === testId && submission.status !== "graded",
-  );
-  updateTest(classroomId, testId, { status: remaining ? "collecting" : "graded" });
 }
 
 /* ---------- Workspace lifecycle ---------- */
