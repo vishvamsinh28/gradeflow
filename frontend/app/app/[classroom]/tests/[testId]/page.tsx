@@ -207,7 +207,7 @@ export default function TestWorkspacePage() {
     });
     if (!ok) return;
     try {
-      await removeTest(test.id, classroom.slug);
+      await removeTest(test.id);
       router.push(`/app/${classroom.slug}/tests`);
       toast("Test deleted", "success");
     } catch (error) {
@@ -446,7 +446,6 @@ export default function TestWorkspacePage() {
       <EditTestDialog
         open={editOpen}
         onClose={() => setEditOpen(false)}
-        slug={classroom.slug}
         test={test}
         subjects={classroom.subjects}
       />
@@ -708,13 +707,11 @@ function AttendanceToggle({
 function EditTestDialog({
   open,
   onClose,
-  slug,
   test,
   subjects,
 }: {
   open: boolean;
   onClose: () => void;
-  slug: string;
   test: { id: string; title: string | null; test_date: string; subject_id: string | null; max_marks: number; instructions: string | null };
   subjects: { id: string; name: string }[];
 }) {
@@ -738,7 +735,7 @@ function EditTestDialog({
   async function save() {
     setSaving(true);
     try {
-      await updateTest(test.id, slug, {
+      await updateTest(test.id, {
         title: title.trim() || undefined,
         test_date: date,
         subject_id: subjectId || null,

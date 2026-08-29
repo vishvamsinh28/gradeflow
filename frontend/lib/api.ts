@@ -14,6 +14,7 @@ import type {
   GradeBand,
   ShareResult,
   Student,
+  Subject,
   Submission,
   Test,
   TestWorkspace,
@@ -94,13 +95,13 @@ export const deleteClassroom = (id: string) =>
 /* ---------- subjects ---------- */
 
 export const createSubject = (classroomId: string, name: string) =>
-  request<{ id: string; name: string }>(`/classrooms/${classroomId}/subjects`, {
+  request<Subject>(`/classrooms/${classroomId}/subjects`, {
     method: "POST",
     body: JSON.stringify({ name }),
   });
 
 export const renameSubject = (id: string, name: string) =>
-  request<{ id: string; name: string }>(`/subjects/${id}`, {
+  request<Subject>(`/subjects/${id}`, {
     method: "PATCH",
     body: JSON.stringify({ name }),
   });

@@ -177,6 +177,53 @@ function patchTest(testId: ID, patch: Partial<TestWorkspace>) {
   emit();
 }
 
+function patchClassroom(id: ID, patch: (room: Classroom) => Classroom) {
+  const classrooms = cache.classrooms;
+  if (!classrooms) return;
+  cache.classrooms = classrooms.map((room) => (room.id === id ? patch(room) : room));
+  emit();
+}
+
+/**
+ * Fold a freshly-fetched test back into the cached classroom.
+ *
+ * The dashboard reads its progress counts out of `cache.classrooms`, so a test
+ * mutation that only refreshed `cache.byId` left it showing stale numbers until
+ * a full page reload — mark a student absent, go back, still "0 of 4".
+ */
+function syncClassroomFromTest(workspace: TestWorkspace) {
+  const testId = workspace.test.id;
+  patchClassroom(workspace.classroom.id, (room) => ({
+    ...room,
+    students: workspace.students,
+    tests: room.tests.some((test) => test.id === testId)
+      ? room.tests.map((test) => (test.id === testId ? workspace.test : test))
+      : sortTests([workspace.test, ...room.tests]),
+    submissions: [
+      ...room.submissions.filter((row) => row.test_id !== testId),
+      ...workspace.submissions,
+    ],
+    attendance: [
+      ...room.attendance.filter((row) => row.test_id !== testId),
+      ...workspace.attendance,
+    ],
+  }));
+}
+
+/** Matches the server's ordering, so a locally-inserted test lands where a refetch would put it. */
+function sortTests<T extends { test_date: string }>(tests: T[]): T[] {
+  return [...tests].sort((a, b) => b.test_date.localeCompare(a.test_date));
+}
+
+/** One fetch, both caches. Replaces the getTest + getClassroom pair. */
+async function refreshTest(testId: ID): Promise<TestWorkspace> {
+  const workspace = await api.getTest(testId);
+  cache.byId = { ...cache.byId, [testId]: workspace };
+  syncClassroomFromTest(workspace);
+  emit();
+  return workspace;
+}
+
 /* ---------- mutations ----------
    Each returns the server's answer and refreshes the cache from it. */
 
@@ -205,18 +252,33 @@ export async function removeClassroom(id: ID): Promise<void> {
 }
 
 export async function addSubject(classroom: Classroom, name: string) {
-  await api.createSubject(classroom.id, name);
-  replaceClassroom(await api.getClassroom(classroom.slug));
+  const created = await api.createSubject(classroom.id, name);
+  patchClassroom(classroom.id, (room) => ({
+    ...room,
+    // The server upserts on (classroom, name), so re-adding an existing subject
+    // returns the row that is already here rather than a second one.
+    subjects: room.subjects.some((subject) => subject.id === created.id)
+      ? room.subjects.map((subject) => (subject.id === created.id ? created : subject))
+      : [...room.subjects, created],
+  }));
 }
 
 export async function renameSubject(classroom: Classroom, id: ID, name: string) {
-  await api.renameSubject(id, name);
-  replaceClassroom(await api.getClassroom(classroom.slug));
+  const updated = await api.renameSubject(id, name);
+  patchClassroom(classroom.id, (room) => ({
+    ...room,
+    subjects: room.subjects.map((subject) => (subject.id === id ? updated : subject)),
+  }));
 }
 
 export async function removeSubject(classroom: Classroom, id: ID) {
   await api.deleteSubject(id);
-  replaceClassroom(await api.getClassroom(classroom.slug));
+  patchClassroom(classroom.id, (room) => ({
+    ...room,
+    subjects: room.subjects.filter((subject) => subject.id !== id),
+    // The server clears the link rather than deleting the tests behind it.
+    tests: room.tests.map((test) => (test.subject_id === id ? { ...test, subject_id: null } : test)),
+  }));
 }
 
 export async function addStudents(
@@ -224,7 +286,7 @@ export async function addStudents(
   students: { name: string; roll_no?: string }[],
 ): Promise<number> {
   const created = await api.addStudents(classroom.id, students);
-  replaceClassroom(await api.getClassroom(classroom.slug));
+  patchClassroom(classroom.id, (room) => ({ ...room, students: [...room.students, ...created] }));
   return created.length;
 }
 
@@ -233,13 +295,21 @@ export async function updateStudent(
   id: ID,
   input: { name?: string; roll_no?: string },
 ) {
-  await api.updateStudent(id, input);
-  replaceClassroom(await api.getClassroom(classroom.slug));
+  const updated = await api.updateStudent(id, input);
+  patchClassroom(classroom.id, (room) => ({
+    ...room,
+    students: room.students.map((student) => (student.id === id ? updated : student)),
+  }));
 }
 
 export async function removeStudent(classroom: Classroom, id: ID) {
   await api.deleteStudent(id);
-  replaceClassroom(await api.getClassroom(classroom.slug));
+  patchClassroom(classroom.id, (room) => ({
+    ...room,
+    students: room.students.filter((student) => student.id !== id),
+    submissions: room.submissions.filter((row) => row.student_id !== id),
+    attendance: room.attendance.filter((row) => row.student_id !== id),
+  }));
 }
 
 export async function createTest(
@@ -247,25 +317,30 @@ export async function createTest(
   input: Parameters<typeof api.createTest>[1],
 ): Promise<Test> {
   const test = await api.createTest(classroom.id, input);
-  replaceClassroom(await api.getClassroom(classroom.slug));
+  patchClassroom(classroom.id, (room) => ({ ...room, tests: sortTests([test, ...room.tests]) }));
   return test;
 }
 
-export async function updateTest(
-  testId: ID,
-  slug: string,
-  input: Parameters<typeof api.updateTest>[1],
-) {
+export async function updateTest(testId: ID, input: Parameters<typeof api.updateTest>[1]) {
   await api.updateTest(testId, input);
-  cache.byId = { ...cache.byId, [testId]: await api.getTest(testId) };
-  replaceClassroom(await api.getClassroom(slug));
+  await refreshTest(testId);
 }
 
-export async function removeTest(testId: ID, slug: string) {
+export async function removeTest(testId: ID) {
+  const classroomId = cache.byId[testId]?.classroom.id;
   await api.deleteTest(testId);
   const { [testId]: _removed, ...rest } = cache.byId;
   cache.byId = rest;
-  replaceClassroom(await api.getClassroom(slug));
+  if (classroomId) {
+    patchClassroom(classroomId, (room) => ({
+      ...room,
+      tests: room.tests.filter((test) => test.id !== testId),
+      submissions: room.submissions.filter((row) => row.test_id !== testId),
+      attendance: room.attendance.filter((row) => row.test_id !== testId),
+    }));
+  } else {
+    emit();
+  }
 }
 
 export async function setAttendance(
@@ -273,21 +348,18 @@ export async function setAttendance(
   entries: { student_id: ID; mark: AttendanceMark }[],
 ) {
   await api.setAttendance(testId, entries);
-  cache.byId = { ...cache.byId, [testId]: await api.getTest(testId) };
-  emit();
+  await refreshTest(testId);
 }
 
 export async function uploadSheets(testId: ID, files: File[]) {
   const outcome = await api.uploadSheets(testId, files);
-  cache.byId = { ...cache.byId, [testId]: await api.getTest(testId) };
-  emit();
+  await refreshTest(testId);
   return outcome;
 }
 
 export async function removeSubmission(testId: ID, submissionId: ID) {
   await api.deleteSubmission(submissionId);
-  cache.byId = { ...cache.byId, [testId]: await api.getTest(testId) };
-  emit();
+  await refreshTest(testId);
 }
 
 export async function reviewSubmission(
@@ -301,6 +373,10 @@ export async function reviewSubmission(
     patchTest(testId, {
       submissions: workspace.submissions.map((s) => (s.id === updated.id ? updated : s)),
     });
+    patchClassroom(workspace.classroom.id, (room) => ({
+      ...room,
+      submissions: room.submissions.map((s) => (s.id === updated.id ? updated : s)),
+    }));
   }
   return updated;
 }
@@ -312,8 +388,7 @@ export async function gradeTest(testId: ID) {
 
 export async function regradeTest(testId: ID, correction: string, onlyFlagged = false) {
   const result = await api.regradeTest(testId, correction, onlyFlagged);
-  cache.byId = { ...cache.byId, [testId]: await api.getTest(testId) };
-  emit();
+  await refreshTest(testId);
   return result;
 }
 

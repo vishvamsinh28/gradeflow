@@ -8,6 +8,8 @@ teacher notes, no other student's work — crosses this boundary.
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException
 from supabase import Client
 
@@ -19,6 +21,14 @@ router = APIRouter(prefix="/share", tags=["share"])
 
 @router.get("/{share_token}")
 def student_results(share_token: str, db: Client = Depends(get_supabase)):
+    # share_token is a uuid column: a truncated or mistyped link would otherwise
+    # reach Postgres, fail the cast, and surface to a parent as a 500. A bad
+    # token is a bad link, which is a 404.
+    try:
+        UUID(share_token)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="This results link is not valid") from None
+
     found = (
         db.table("classroom_students")
         .select("id,name,code,classroom_id")

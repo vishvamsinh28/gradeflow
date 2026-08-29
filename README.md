@@ -12,29 +12,12 @@ Create classroom → Add students → Create test → Upload answers → AI grad
 
 ## Getting started
 
-There are two ways to run this, depending on whether you want the AI grading server.
+GradeFlow is a frontend and an API. Everything a teacher owns lives in Postgres, so the
+API is not optional — without `API_URL` the app renders but nothing can be saved.
 
-| | What you get | What you need |
-| --- | --- | --- |
-| **A — app only** | The full interface. Accounts and your workspace live in the browser. Grading is simulated locally. | Node 20+ |
-| **B — full stack** | Real accounts and real Gemini grading, backed by Postgres. | Everything in A, plus Python 3.11–3.13, `psql`, a Supabase project and a Gemini API key |
+You will need Node 20+, Python 3.11–3.13, `psql`, a Supabase project and a Gemini API key.
 
-Start with A. It runs in two commands and needs no accounts anywhere.
-
-### A — app only
-
-```bash
-git clone <your-fork-or-this-repo> gradeflow
-cd gradeflow/frontend
-npm install
-npm run dev
-```
-
-Open <http://localhost:3000>, create an account on `/signup`, and you are in. The account
-and everything you create are stored in that browser — see [Accounts](#accounts) for what
-that does and does not mean.
-
-### B — full stack
+### Setting it up
 
 **1. Install everything.** From the repo root:
 
@@ -97,8 +80,9 @@ Frontend on <http://localhost:3000>, API on <http://localhost:8000>. `Ctrl+C` st
 ### If something goes wrong
 
 - **`Cannot reach the GradeFlow server` on sign-in** — the frontend has
-  `API_URL` set but the API is not running. Start it with `make backend`, or
-  comment the variable out to go back to browser-local accounts.
+  `API_URL` set but the API is not running. Start it with `make backend`.
+- **`No API is configured`** — `API_URL` is unset in `frontend/.env`. The app needs it;
+  there is no offline mode.
 - **`Supabase schema is not ready`** — the tables do not exist yet. Run `make db-setup`,
   wait a few seconds for Supabase's schema cache, and retry.
 - **`MODULE_NOT_FOUND` from Next, or a dev server that hangs** — two Next processes are
@@ -157,23 +141,20 @@ classroom, `t` creates a test, `/` opens search.
 
 ## Accounts
 
-Every workspace belongs to a signed-in teacher. [`frontend/lib/auth.ts`](frontend/lib/auth.ts)
-has two backends behind one interface:
-
-| Mode | When | What happens |
-| --- | --- | --- |
-| `api` | `API_URL` is set | Real accounts against the FastAPI service — bcrypt hashing, JWT in an http-only cookie, Bearer fallback for preview deployments |
-| `local` | no API configured | Accounts live in this browser so the product runs with no server. Passwords are PBKDF2-hashed rather than stored, but this is **not** a security boundary — it exists so the app can be run and demonstrated |
+Every workspace belongs to a signed-in teacher.
+[`frontend/lib/auth.ts`](frontend/lib/auth.ts) talks to the API and nothing else — there is
+no local fallback. Accounts are bcrypt-hashed server-side, with the JWT in an http-only
+cookie and a Bearer fallback for preview deployments where a cross-origin cookie cannot be
+read back.
 
 `/app` and everything under it redirect to `/signin` without a session. A new account starts
 with an empty workspace and one call to action: create your first classroom.
 
 Sessions persist until the teacher signs out. The http-only cookie is the primary session;
 the JWT is mirrored into `localStorage` (not `sessionStorage`) so closing the tab does not
-sign anyone out.
-
-Workspace data is stored per account under `gradeflow.workspace.v2:<userId>`, so two accounts
-in the same browser never see each other's classrooms.
+sign anyone out. That token is the only thing the app keeps in browser storage — classrooms,
+students, tests and marks are read from Postgres on demand, so clearing site data costs you
+the session and nothing else.
 
 ## Design system
 
@@ -210,60 +191,50 @@ frontend/
     app/                          The workspace (client-rendered)
       layout.tsx                  App shell: top bar, command palette, create flows
       [classroom]/…               Classroom surfaces
+    results/[token]/              The read-only page a parent opens
   components/
     ui/                           Design-system primitives (buttons, fields, overlays…)
     app/                          Workspace components
     landing/                      Product replicas used on the landing page
   lib/
     types.ts                      Domain model
-    store.ts                      Workspace store + derived data
-    ai.ts                         The AI seam (matching, extraction, grading)
-                                  plus the deterministic stand-in for the model
+    api.ts                        Typed client for the FastAPI service
+    workspace.ts                  Server-backed cache + derived data
     parse.ts                      Roster parsing (paste / CSV / TSV)
+    runtime-config.ts             Resolves `API_URL` at runtime, not build time
 ```
 
-The store is a small vanilla store read through `useSyncExternalStore` and persisted to
-`localStorage`. Long-running work (grading a batch) lives in the store rather than in a
-component, so a teacher can start grading and navigate away while it finishes.
+Everything a teacher owns lives in Postgres. `workspace.ts` is a cache in front of the API
+read through `useSyncExternalStore` — not a source of truth — so clearing browser storage
+loses nothing but the session. The only thing in `localStorage` is the auth token.
+
+Mutations refresh the cache from what the server returned rather than refetching, and a
+test mutation folds its result back into the cached classroom so the dashboard's progress
+counts cannot drift from the test page.
 
 Landing-page mockups are built from the same design tokens as the real product rather than
 being screenshots, so they stay honest and stay crisp at any size.
 
-### The AI seam
-
-The three AI operations all go through [`frontend/lib/ai.ts`](frontend/lib/ai.ts):
-
-| Call | What it does | Without a grading server |
-| --- | --- | --- |
-| `matchFilesToStudents` | Assigns uploaded sheets to students | Real heuristics on filename (ID, roll number, name); anything left over falls back to roster order |
-| `extractRoster` | Reads a student list out of a file | Real parsing for CSV/TSV/TXT; a stand-in extraction for images and PDFs |
-| `gradeSubmission` | Marks one answer sheet | Deterministic simulated marking with per-question feedback, seeded so a submission always returns the same marks |
-
-That file is the only place to change when pointing the app at a live backend.
-
 ## Backend
 
-`backend/` holds the original FastAPI service: Supabase Postgres and private Storage,
-custom JWT auth, Gemini multimodal extraction and grading, and a LangGraph grading workflow.
-See [`backend/supabase/schema.sql`](backend/supabase/schema.sql) and `backend/app/`.
+`backend/` holds the FastAPI service: Supabase Postgres and private Storage, custom JWT
+auth, and Gemini multimodal grading. See
+[`backend/supabase/schema.sql`](backend/supabase/schema.sql), the migrations beside it,
+and `backend/app/`.
 
-**Auth is already wired up.** `/auth/register`, `/auth/login`, `/auth/logout` and `/auth/me`
-back the sign-in and sign-up screens whenever `API_URL` is set.
+The domain is `classrooms → subjects · students · tests → submissions · attendance`.
 
-**The rest has not been migrated to the redesigned domain model yet.** It still models
-`classes → assignments (answer_key, rubric, total_points) → submissions`, so classrooms,
-tests and marks are still held client-side. Moving them onto the server needs:
+| Area | Endpoints |
+| --- | --- |
+| Auth | `/auth/register`, `/auth/login`, `/auth/logout`, `/auth/me` |
+| Classrooms | CRUD, plus the grade scale |
+| Subjects, students | CRUD, bulk import, `POST /classrooms/{id}/students/extract` to read a photographed register |
+| Tests | CRUD, attendance, `POST /tests/{id}/grade`, `POST /tests/{id}/regrade` |
+| Answer sheets | Bulk upload with per-page student matching, review, `GET /sheets/{id}/file` |
+| Sharing | `GET /share/{token}` — unauthenticated, whitelisted fields, graded tests only |
 
-- `subjects` (classroom-scoped) and `attendance` (test × student) tables
-- `assignments` → `tests`: a required `date`, optional `subject_id`/`title`, free-text
-  `instructions` replacing `answer_key`/`rubric`, and the three-state status
-- `students`: a stable display `code` (`STU-001`) and `roll_no`
-- Endpoints for bulk student import, bulk answer upload with AI student matching, and
-  attendance
-- A grading prompt driven by the test's free-text instructions rather than a structured
-  rubric
-
-See [Getting started, option B](#b--full-stack) for how to set it up.
+The service role key bypasses RLS, so every query is scoped by owner in the router. Sheets
+live in a private bucket and are served only through an ownership check.
 
 ### Production notes for the backend
 

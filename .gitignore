@@ -52,3 +52,6 @@ tmp/
 
 # Alternate Next build outputs (NEXT_DIST_DIR)
 .next-*/
+
+# Pre-drop dump of the retired assignment/class tables — real student data.
+legacy-data-backup/
