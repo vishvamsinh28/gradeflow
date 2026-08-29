@@ -1,0 +1,46 @@
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/ui/primitives";
+import { useToast } from "@/components/ui/overlays";
+import { IconCheck, IconEye } from "@/components/ui/icons";
+import type { Student } from "@/lib/types";
+
+export function shareUrl(token: string): string {
+  if (typeof window === "undefined") return `/results/${token}`;
+  return `${window.location.origin}/results/${token}`;
+}
+
+/**
+ * Hands a student or parent their own marks.
+ *
+ * The link carries an unguessable per-student token and shows only graded,
+ * released work — one student, never the class.
+ */
+export function ShareLinkButton({ student }: { student: Student }) {
+  const toast = useToast();
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    const url = shareUrl(student.share_token);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      toast(`Results link for ${student.name} copied`, "success");
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard access can be refused; showing the link still lets them copy it.
+      toast(url, "info");
+    }
+  }
+
+  return (
+    <Button
+      size="sm"
+      icon={copied ? <IconCheck size={14} /> : <IconEye size={14} />}
+      onClick={() => void copy()}
+    >
+      {copied ? "Link copied" : "Copy results link"}
+    </Button>
+  );
+}

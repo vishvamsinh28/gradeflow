@@ -26,7 +26,7 @@ import {
   IconUsers,
 } from "@/components/ui/icons";
 import { useWorkspaceActions } from "@/components/app/shell";
-import { deleteClassroom, updateClassroom, useClassroom } from "@/lib/store";
+import { removeClassroom, updateClassroom, useClassroom } from "@/lib/workspace";
 import { pluralize } from "@/lib/format";
 
 const TABS = [
@@ -42,9 +42,18 @@ export default function ClassroomLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const confirm = useConfirm();
   const toast = useToast();
-  const classroom = useClassroom(params.classroom);
+  const { data: classroom, loading } = useClassroom(params.classroom);
   const { newTest, addStudents } = useWorkspaceActions();
   const [renaming, setRenaming] = useState(false);
+
+  if (loading && !classroom) {
+    return (
+      <div className="mx-auto w-full max-w-[1360px] px-4 py-10 sm:px-6">
+        <div className="skeleton h-7 w-52 rounded-md" />
+        <div className="skeleton mt-6 h-64 rounded-xl" />
+      </div>
+    );
+  }
 
   if (!classroom) {
     return (
@@ -76,9 +85,13 @@ export default function ClassroomLayout({ children }: { children: React.ReactNod
       danger: true,
     });
     if (!ok) return;
-    deleteClassroom(classroom.id);
-    router.push("/app");
-    toast("Classroom deleted", "success");
+    try {
+      await removeClassroom(classroom.id);
+      router.push("/app");
+      toast("Classroom deleted", "success");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not delete that classroom", "error");
+    }
   }
 
   return (
@@ -216,11 +229,15 @@ function RenameClassroomDialog({
     setDraftDescription(description);
   }, [open, name, description]);
 
-  function save() {
+  async function save() {
     if (!draftName.trim()) return;
-    updateClassroom(id, { name: draftName, description: draftDescription });
-    onClose();
-    toast("Classroom updated", "success");
+    try {
+      await updateClassroom(id, { name: draftName, description: draftDescription });
+      onClose();
+      toast("Classroom updated", "success");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not save those changes", "error");
+    }
   }
 
   return (
@@ -234,7 +251,7 @@ function RenameClassroomDialog({
           <Button size="sm" onClick={onClose}>
             Cancel
           </Button>
-          <Button size="sm" variant="primary" onClick={save} disabled={!draftName.trim()}>
+          <Button size="sm" variant="primary" onClick={() => void save()} disabled={!draftName.trim()}>
             Save
           </Button>
         </>
@@ -244,7 +261,7 @@ function RenameClassroomDialog({
         className="grid gap-4"
         onSubmit={(event) => {
           event.preventDefault();
-          save();
+          void save();
         }}
       >
         <Field label="Classroom name">

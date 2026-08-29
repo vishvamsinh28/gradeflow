@@ -3,7 +3,7 @@
 import { Avatar, Badge, Button, EmptyState, cx } from "@/components/ui/primitives";
 import { Sheet, useConfirm, useToast } from "@/components/ui/overlays";
 import { IconCalendar, IconTrash } from "@/components/ui/icons";
-import { attendanceOf, removeStudent, updateStudent, useDatabase } from "@/lib/store";
+import { attendanceOf, removeStudent, updateStudent } from "@/lib/workspace";
 import { formatDateShort, formatMark, formatPercent, markTone } from "@/lib/format";
 import type { Classroom, Student } from "@/lib/types";
 
@@ -24,21 +24,21 @@ export function StudentSheet({
   classroom: Classroom;
   onClose: () => void;
 }) {
-  const db = useDatabase();
   const confirm = useConfirm();
   const toast = useToast();
 
   const rows = student
     ? [...classroom.tests]
-        .sort((a, b) => b.date.localeCompare(a.date))
+        .sort((a, b) => b.test_date.localeCompare(a.test_date))
         .map((test) => {
-          const submission = db.submissions.find(
-            (item) => item.testId === test.id && item.studentId === student.id,
+          const submission = classroom.submissions.find(
+            (item) => item.test_id === test.id && item.student_id === student.id,
           );
-          const absent = attendanceOf(db, test.id, student.id) === "absent";
+          const absent =
+            attendanceOf(classroom.attendance, test.id, student.id) === "absent";
           const percent =
-            submission?.status === "graded" && submission.outOf
-              ? ((submission.score ?? 0) / submission.outOf) * 100
+            submission?.status === "graded" && submission.out_of
+              ? ((submission.score ?? 0) / submission.out_of) * 100
               : null;
           return { test, submission, absent, percent };
         })
@@ -58,7 +58,7 @@ export function StudentSheet({
       input.value = student.name;
       return;
     }
-    updateStudent(classroom.id, student.id, { name });
+    void updateStudent(classroom, student.id, { name });
   }
 
   async function remove() {
@@ -70,9 +70,13 @@ export function StudentSheet({
       danger: true,
     });
     if (!ok) return;
-    removeStudent(classroom.id, student.id);
-    onClose();
-    toast("Student removed", "success");
+    try {
+      await removeStudent(classroom, student.id);
+      onClose();
+      toast("Student removed", "success");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not remove that student", "error");
+    }
   }
 
   return (
@@ -80,7 +84,7 @@ export function StudentSheet({
       open={student !== null}
       onClose={onClose}
       title={student?.name ?? ""}
-      description={student ? `${student.code}${student.rollNo ? ` · Roll ${student.rollNo}` : ""}` : undefined}
+      description={student ? `${student.code}${student.roll_no ? ` · Roll ${student.roll_no}` : ""}` : undefined}
       width={540}
       footer={
         <>
@@ -114,12 +118,12 @@ export function StudentSheet({
               />
               <input
                 key={`${student.id}-roll`}
-                defaultValue={student.rollNo ?? ""}
+                defaultValue={student.roll_no ?? ""}
                 placeholder="Add roll number"
                 aria-label="Roll number"
                 onBlur={(event) =>
-                  updateStudent(classroom.id, student.id, {
-                    rollNo: event.target.value.trim() || undefined,
+                  void updateStudent(classroom, student.id, {
+                    roll_no: event.target.value.trim() || undefined,
                   })
                 }
                 onKeyDown={(event) => {
@@ -160,7 +164,7 @@ export function StudentSheet({
           ) : (
             <ul className="divide-y divide-line">
               {rows.map(({ test, submission, absent, percent }) => {
-                const subject = classroom.subjects.find((item) => item.id === test.subjectId);
+                const subject = classroom.subjects.find((item) => item.id === test.subject_id);
                 return (
                   <li key={test.id} className="flex items-center gap-3 px-5 py-2.5">
                     <div className="min-w-0 flex-1">
@@ -168,7 +172,7 @@ export function StudentSheet({
                         {test.title ?? "Untitled test"}
                       </p>
                       <p className="mt-0.5 text-[12px] text-ink-3">
-                        {subject?.name ?? "No subject"} · {formatDateShort(test.date)}
+                        {subject?.name ?? "No subject"} · {formatDateShort(test.test_date)}
                       </p>
                     </div>
                     {absent ? (
@@ -181,7 +185,7 @@ export function StudentSheet({
                       <div className="text-right">
                         <p className={cx("font-mono text-[13.5px] font-medium tnum", TONE_TEXT[markTone(percent)])}>
                           {formatMark(submission?.score ?? 0)}
-                          <span className="text-ink-4">/{submission?.outOf}</span>
+                          <span className="text-ink-4">/{submission?.out_of}</span>
                         </p>
                         <p className="font-mono text-[11.5px] text-ink-3 tnum">
                           {formatPercent(percent)}

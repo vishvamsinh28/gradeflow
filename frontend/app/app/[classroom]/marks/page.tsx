@@ -6,8 +6,9 @@ import { Badge, Button, EmptyState, Input, Segmented, Select, cx } from "@/compo
 import { useToast } from "@/components/ui/overlays";
 import { IconDownload, IconSearch, IconTable } from "@/components/ui/icons";
 import { StudentSheet } from "@/components/app/student-sheet";
+import { ShareLinkButton } from "@/components/app/share-link";
 import { SortHeader, TD, compareValues, nextSort, type SortDirection } from "@/components/app/table";
-import { attendanceOf, useClassroom, useDatabase } from "@/lib/store";
+import { attendanceOf, gradeFor, useClassroom } from "@/lib/workspace";
 import { formatDateShort, formatPercent, markTone, pluralize } from "@/lib/format";
 import type { Student } from "@/lib/types";
 
@@ -24,8 +25,7 @@ const TONE_TEXT = {
 
 export default function MarksPage() {
   const params = useParams<{ classroom: string }>();
-  const db = useDatabase();
-  const classroom = useClassroom(params.classroom);
+  const { data: classroom } = useClassroom(params.classroom);
   const toast = useToast();
 
   const [view, setView] = useState<View>("subjects");
@@ -39,13 +39,12 @@ export default function MarksPage() {
   });
   const [selected, setSelected] = useState<Student | null>(null);
 
-  /** Tests in play after the subject/test filters — everything downstream uses these. */
   const scopedTests = useMemo(() => {
     if (!classroom) return [];
     return classroom.tests
-      .filter((test) => (subjectId ? test.subjectId === subjectId : true))
+      .filter((test) => (subjectId ? test.subject_id === subjectId : true))
       .filter((test) => (testId ? test.id === testId : true))
-      .sort((a, b) => a.date.localeCompare(b.date));
+      .sort((a, b) => a.test_date.localeCompare(b.test_date));
   }, [classroom, subjectId, testId]);
 
   const columns = useMemo(() => {
@@ -54,7 +53,7 @@ export default function MarksPage() {
       return scopedTests.map((test) => ({
         id: test.id,
         label: test.title ?? "Untitled",
-        sub: formatDateShort(test.date),
+        sub: formatDateShort(test.test_date),
         testIds: [test.id],
       }));
     }
@@ -63,27 +62,28 @@ export default function MarksPage() {
       .map((subject) => ({
         id: subject.id,
         label: subject.name,
-        sub: pluralize(scopedTests.filter((test) => test.subjectId === subject.id).length, "test"),
-        testIds: scopedTests.filter((test) => test.subjectId === subject.id).map((test) => test.id),
+        sub: pluralize(scopedTests.filter((test) => test.subject_id === subject.id).length, "test"),
+        testIds: scopedTests.filter((test) => test.subject_id === subject.id).map((test) => test.id),
       }));
   }, [classroom, view, subjectId, scopedTests]);
 
   const rows = useMemo(() => {
     if (!classroom) return [];
-    const scopedIds = new Set(scopedTests.map((test) => test.id));
+    const scopedIds = scopedTests.map((test) => test.id);
 
     return classroom.students.map((student) => {
       const percentFor = (testIds: string[]) => {
         const values = testIds
           .map((id) => {
-            const submission = db.submissions.find(
-              (item) => item.testId === id && item.studentId === student.id && item.status === "graded",
+            const submission = classroom.submissions.find(
+              (item) =>
+                item.test_id === id && item.student_id === student.id && item.status === "graded",
             );
-            if (!submission?.outOf) return null;
-            return ((submission.score ?? 0) / submission.outOf) * 100;
+            if (!submission?.out_of) return null;
+            return ((submission.score ?? 0) / submission.out_of) * 100;
           })
           .filter((value): value is number => value !== null);
-        return values.length > 0
+        return values.length
           ? values.reduce((sum, value) => sum + value, 0) / values.length
           : null;
       };
@@ -93,23 +93,20 @@ export default function MarksPage() {
         cells[column.id] = percentFor(column.testIds);
       });
 
-      const all = percentFor([...scopedIds]);
+      const average = percentFor(scopedIds);
       const absences = scopedTests.filter(
-        (test) => attendanceOf(db, test.id, student.id) === "absent",
+        (test) => attendanceOf(classroom.attendance, test.id, student.id) === "absent",
       ).length;
 
       return {
         student,
         cells,
-        average: all,
+        average,
+        grade: gradeFor(average, classroom.grade_scale ?? []),
         absences,
-        attendancePercent:
-          scopedTests.length > 0
-            ? ((scopedTests.length - absences) / scopedTests.length) * 100
-            : null,
       };
     });
-  }, [classroom, columns, db, scopedTests]);
+  }, [classroom, columns, scopedTests]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -130,8 +127,7 @@ export default function MarksPage() {
       if (sort.key === "name") return compareValues(a.student.name, b.student.name, sort.direction);
       if (sort.key === "code") return compareValues(a.student.code, b.student.code, sort.direction);
       if (sort.key === "average") return compareValues(a.average, b.average, sort.direction);
-      if (sort.key === "attendance")
-        return compareValues(a.attendancePercent, b.attendancePercent, sort.direction);
+      if (sort.key === "attendance") return compareValues(-a.absences, -b.absences, sort.direction);
       return compareValues(a.cells[sort.key] ?? null, b.cells[sort.key] ?? null, sort.direction);
     });
   }, [rows, query, attendance, sort]);
@@ -142,24 +138,37 @@ export default function MarksPage() {
       const values = visible
         .map((row) => (key === "average" ? row.average : row.cells[key]))
         .filter((value): value is number => value !== null && value !== undefined);
-      result[key] =
-        values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+      result[key] = values.length
+        ? values.reduce((sum, value) => sum + value, 0) / values.length
+        : null;
     });
     return result;
   }, [columns, visible]);
 
   if (!classroom) return null;
 
+  const hasScale = (classroom.grade_scale ?? []).length > 0;
+
   function exportCsv() {
     if (!classroom) return;
-    const header = ["Student", "ID", ...columns.map((column) => column.label), "Average", "Absences"];
+    const header = [
+      "Student",
+      "ID",
+      "Roll",
+      ...columns.map((column) => column.label),
+      "Average",
+      ...(hasScale ? ["Grade"] : []),
+      "Absences",
+    ];
     const body = visible.map((row) => [
       row.student.name,
       row.student.code,
+      row.student.roll_no ?? "",
       ...columns.map((column) =>
         row.cells[column.id] === null ? "" : (row.cells[column.id] ?? 0).toFixed(1),
       ),
       row.average === null ? "" : row.average.toFixed(1),
+      ...(hasScale ? [row.grade ?? ""] : []),
       String(row.absences),
     ]);
     const csv = [header, ...body]
@@ -227,10 +236,10 @@ export default function MarksPage() {
         >
           <option value="">All tests</option>
           {classroom.tests
-            .filter((test) => (subjectId ? test.subjectId === subjectId : true))
+            .filter((test) => (subjectId ? test.subject_id === subjectId : true))
             .map((test) => (
               <option key={test.id} value={test.id}>
-                {test.title ?? "Untitled"} · {formatDateShort(test.date)}
+                {test.title ?? "Untitled"} · {formatDateShort(test.test_date)}
               </option>
             ))}
         </Select>
@@ -251,7 +260,12 @@ export default function MarksPage() {
               ? pluralize(rows.length, "student")
               : `${visible.length} of ${rows.length}`}
           </span>
-          <Button size="sm" icon={<IconDownload size={14} />} onClick={exportCsv} disabled={visible.length === 0}>
+          <Button
+            size="sm"
+            icon={<IconDownload size={14} />}
+            onClick={exportCsv}
+            disabled={visible.length === 0}
+          >
             Export
           </Button>
         </div>
@@ -331,6 +345,14 @@ export default function MarksPage() {
                     align="right"
                     className="min-w-[100px] border-l border-line bg-surface-2/70"
                   />
+                  {hasScale ? (
+                    <th
+                      scope="col"
+                      className="sticky top-0 z-10 min-w-[76px] border-b border-line bg-surface px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3"
+                    >
+                      Grade
+                    </th>
+                  ) : null}
                   <SortHeader
                     id="attendance"
                     label="Attendance"
@@ -361,7 +383,9 @@ export default function MarksPage() {
                     >
                       {row.student.name}
                     </td>
-                    <td className={cx(TD, "whitespace-nowrap font-mono text-[12px] text-ink-3")}>{row.student.code}</td>
+                    <td className={cx(TD, "whitespace-nowrap font-mono text-[12px] text-ink-3")}>
+                      {row.student.code}
+                    </td>
                     {columns.map((column) => {
                       const value = row.cells[column.id];
                       return (
@@ -386,13 +410,22 @@ export default function MarksPage() {
                     >
                       {row.average === null ? "—" : row.average.toFixed(1)}
                     </td>
+                    {hasScale ? (
+                      <td className={cx(TD, "text-right")}>
+                        {row.grade ? (
+                          <span className="font-mono text-[13px] font-semibold text-ink">
+                            {row.grade}
+                          </span>
+                        ) : (
+                          <span className="text-ink-4">—</span>
+                        )}
+                      </td>
+                    ) : null}
                     <td className={cx(TD, "pr-4 text-right")}>
                       {row.absences === 0 ? (
                         <Badge tone="muted">Full</Badge>
                       ) : (
-                        <Badge tone="danger">
-                          {row.absences} absent
-                        </Badge>
+                        <Badge tone="danger">{row.absences} absent</Badge>
                       )}
                     </td>
                   </tr>
@@ -402,8 +435,6 @@ export default function MarksPage() {
               <tfoot>
                 <tr>
                   <td className="sticky bottom-0 left-0 z-30 border-r border-t border-line bg-surface-2 py-2 pl-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink-3">
-                    {/* The row averages what is on screen, so it must not claim
-                        to be the class average while a filter is narrowing it. */}
                     {visible.length === rows.length
                       ? "Class average"
                       : `Average of ${visible.length} shown`}
@@ -420,6 +451,11 @@ export default function MarksPage() {
                   <td className="sticky bottom-0 z-20 border-l border-t border-line bg-surface-2 px-3 py-2 text-right font-mono text-[12.5px] font-semibold text-ink tnum">
                     {formatPercent(columnAverages.average, 1)}
                   </td>
+                  {hasScale ? (
+                    <td className="sticky bottom-0 z-20 border-t border-line bg-surface-2 px-3 py-2 text-right font-mono text-[12.5px] text-ink-2">
+                      {gradeFor(columnAverages.average, classroom.grade_scale ?? []) ?? "—"}
+                    </td>
+                  ) : null}
                   <td className="sticky bottom-0 z-20 border-t border-line bg-surface-2 pr-4" />
                 </tr>
               </tfoot>
@@ -427,6 +463,12 @@ export default function MarksPage() {
           </div>
         )}
       </div>
+
+      {selected ? (
+        <div className="mt-3 flex justify-end">
+          <ShareLinkButton student={selected} />
+        </div>
+      ) : null}
 
       <StudentSheet student={selected} classroom={classroom} onClose={() => setSelected(null)} />
     </div>

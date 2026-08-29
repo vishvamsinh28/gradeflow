@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
-from app.routers import analytics, assignments, auth, classes, public, submissions
+from app.routers import analytics, assignments, auth, classes, classroom, public, share, submissions
 from app.routers import settings as settings_router
 
 settings = get_settings()
@@ -35,6 +35,8 @@ app.include_router(submissions.router, prefix=settings.api_prefix)
 app.include_router(analytics.router, prefix=settings.api_prefix)
 app.include_router(settings_router.router, prefix=settings.api_prefix)
 app.include_router(public.router, prefix=settings.api_prefix)
+app.include_router(classroom.router, prefix=settings.api_prefix)
+app.include_router(share.router, prefix=settings.api_prefix)
 
 
 @app.get("/health")

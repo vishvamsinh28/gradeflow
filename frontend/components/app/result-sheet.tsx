@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Badge, Button, IconButton, Input, Kbd, cx } from "@/components/ui/primitives";
+import { Badge, Button, IconButton, Input, Kbd, Segmented, cx } from "@/components/ui/primitives";
 import { Sheet, useToast } from "@/components/ui/overlays";
 import {
   IconAlert,
@@ -10,8 +10,10 @@ import {
   IconCheck,
   IconFile,
   IconSparkle,
+  Spinner,
 } from "@/components/ui/icons";
-import { acceptResult, overrideScore } from "@/lib/store";
+import { fetchSheet } from "@/lib/api";
+import { reviewSubmission } from "@/lib/workspace";
 import { formatMark, formatPercent, markTone } from "@/lib/format";
 import type { Student, Submission, Test } from "@/lib/types";
 
@@ -22,6 +24,64 @@ const TONE_TEXT = {
   low: "text-danger",
   none: "text-ink-4",
 } as const;
+
+/**
+ * The answer sheet itself.
+ *
+ * A teacher will not release thirty marks they cannot check, so the paper sits
+ * beside the marks rather than behind a download.
+ */
+function SheetViewer({ submission }: { submission: Submission }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    let alive = true;
+    setUrl(null);
+    setError(null);
+
+    fetchSheet(submission.id)
+      .then((created) => {
+        objectUrl = created;
+        if (alive) setUrl(created);
+        else URL.revokeObjectURL(created);
+      })
+      .catch(() => alive && setError("Could not load the answer sheet."));
+
+    return () => {
+      alive = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [submission.id]);
+
+  if (error) {
+    return (
+      <div className="flex h-full items-center justify-center px-6 text-center">
+        <p className="text-[13px] text-ink-3">{error}</p>
+      </div>
+    );
+  }
+
+  if (!url) {
+    return (
+      <div className="flex h-full items-center justify-center gap-2 text-[13px] text-ink-3">
+        <Spinner size={14} />
+        Loading the sheet…
+      </div>
+    );
+  }
+
+  const isPdf = (submission.mime_type ?? "").includes("pdf");
+  return isPdf ? (
+    <iframe title="Answer sheet" src={url} className="h-full w-full border-0 bg-surface-2" />
+  ) : (
+    <div className="h-full overflow-auto bg-surface-2 p-3">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt="Answer sheet" className="mx-auto max-w-full rounded-md" />
+    </div>
+  );
+}
 
 export function ResultSheet({
   submission,
@@ -35,18 +95,18 @@ export function ResultSheet({
   student: Student | undefined;
   test: Test;
   onClose: () => void;
-  /** Moves to the previous/next result in the list the teacher is looking at. */
   onStep?: (direction: -1 | 1) => void;
   position?: { index: number; total: number };
 }) {
   const toast = useToast();
   const [draft, setDraft] = useState("");
+  const [pane, setPane] = useState<"marks" | "sheet">("marks");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setDraft(submission?.score !== undefined ? String(submission.score) : "");
+    setDraft(submission?.score !== null && submission?.score !== undefined ? String(submission.score) : "");
   }, [submission]);
 
-  // Walk a batch of results without closing the panel between each one.
   useEffect(() => {
     if (!submission || !onStep) return;
     function onKeyDown(event: KeyboardEvent) {
@@ -65,20 +125,43 @@ export function ResultSheet({
   }, [submission, onStep]);
 
   const percent =
-    submission?.outOf && submission.score !== undefined
-      ? (submission.score / submission.outOf) * 100
+    submission?.out_of && submission.score !== null && submission.score !== undefined
+      ? (submission.score / submission.out_of) * 100
       : null;
 
   const changed =
-    submission?.score !== undefined && draft !== "" && Number(draft) !== submission.score;
+    submission?.score !== null &&
+    submission?.score !== undefined &&
+    draft !== "" &&
+    Number(draft) !== submission.score;
 
-  function save() {
+  async function save() {
     if (!submission || draft === "") return;
-    const value = Math.max(0, Math.min(Number(draft), submission.outOf ?? test.maxMarks));
-    overrideScore(submission.id, value);
-    toast("Mark updated", "success");
-    if (onStep && position && position.total > 1) onStep(1);
-    else onClose();
+    setSaving(true);
+    try {
+      await reviewSubmission(test.id, submission.id, {
+        score: Math.max(0, Math.min(Number(draft), submission.out_of ?? test.max_marks)),
+      });
+      toast("Mark updated", "success");
+      if (onStep && position && position.total > 1) onStep(1);
+      else onClose();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not save that mark", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function accept() {
+    if (!submission) return;
+    try {
+      await reviewSubmission(test.id, submission.id, { accept: true });
+      toast("Marked as reviewed", "success");
+      if (onStep && position && position.total > 1) onStep(1);
+      else onClose();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not save that", "error");
+    }
   }
 
   return (
@@ -87,7 +170,7 @@ export function ResultSheet({
       onClose={onClose}
       title={student?.name ?? "Result"}
       description={student ? `${student.code} · ${test.title ?? "Untitled test"}` : undefined}
-      width={560}
+      width={880}
       footer={
         <>
           {onStep && position && position.total > 1 ? (
@@ -107,79 +190,114 @@ export function ResultSheet({
               </span>
             </div>
           ) : null}
-          {submission?.needsReview ? (
-            <Button
-              size="sm"
-              icon={<IconCheck size={14} />}
-              onClick={() => {
-                acceptResult(submission.id);
-                toast("Marked as reviewed", "success");
-                if (onStep && position && position.total > 1) onStep(1);
-                else onClose();
-              }}
-            >
+          {submission?.needs_review ? (
+            <Button size="sm" icon={<IconCheck size={14} />} onClick={() => void accept()}>
               Looks right
             </Button>
           ) : null}
           <Button size="sm" onClick={onClose}>
             Close
           </Button>
-          <Button size="sm" variant="primary" onClick={save} disabled={!changed}>
+          <Button
+            size="sm"
+            variant="primary"
+            loading={saving}
+            onClick={() => void save()}
+            disabled={!changed}
+          >
             Save mark
           </Button>
         </>
       }
     >
       {submission ? (
-        <div>
-          <div className="border-b border-line px-5 py-4">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">
-                  Mark
-                </p>
-                <p className="mt-1 flex items-baseline gap-1.5">
-                  <span
-                    className={cx(
-                      "font-mono text-[30px] font-medium tracking-[-0.03em] tnum",
-                      TONE_TEXT[markTone(percent)],
-                    )}
-                  >
-                    {formatMark(submission.score ?? 0)}
-                  </span>
-                  <span className="font-mono text-[16px] text-ink-4 tnum">
-                    / {submission.outOf ?? test.maxMarks}
-                  </span>
-                  <span className="ml-1 font-mono text-[14px] text-ink-3 tnum">
-                    {formatPercent(percent)}
-                  </span>
-                </p>
+        <div className="flex h-full flex-col lg:flex-row">
+          {/* The paper. Full height on desktop; a tab on a phone. */}
+          <div
+            className={cx(
+              "min-h-[280px] flex-1 border-line lg:min-h-0 lg:border-r",
+              pane === "sheet" ? "block" : "hidden lg:block",
+            )}
+          >
+            {!submission.file_name ? (
+              <div className="flex h-full items-center justify-center px-6 text-center text-[13px] text-ink-3">
+                No answer sheet was stored for this student.
               </div>
-              <div className="flex flex-col items-end gap-1.5">
-                {submission.overridden ? <Badge tone="neutral">Edited by you</Badge> : null}
-                {submission.needsReview ? (
-                  <Badge tone="warn" icon={<IconAlert size={11} />}>
-                    Wants a second look
-                  </Badge>
-                ) : null}
-                {submission.fileName ? (
-                  <span className="inline-flex items-center gap-1.5 font-mono text-[11.5px] text-ink-4">
-                    <IconFile size={11} />
-                    {submission.fileName}
-                  </span>
-                ) : null}
-              </div>
+            ) : (
+              <SheetViewer submission={submission} />
+            )}
+          </div>
+
+          <div
+            className={cx(
+              "w-full shrink-0 overflow-y-auto lg:w-[360px]",
+              pane === "marks" ? "block" : "hidden lg:block",
+            )}
+          >
+            <div className="border-b border-line px-5 py-3 lg:hidden">
+              <Segmented
+                value={pane}
+                onChange={setPane}
+                options={[
+                  { value: "marks", label: "Marks" },
+                  { value: "sheet", label: "Answer sheet" },
+                ]}
+              />
             </div>
 
-            <div className="mt-4 flex items-end gap-2">
-              <label className="flex-1">
+            <div className="border-b border-line px-5 py-4">
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">
+                    Mark
+                  </p>
+                  <p className="mt-1 flex items-baseline gap-1.5">
+                    <span
+                      className={cx(
+                        "font-mono text-[30px] font-medium tracking-[-0.03em] tnum",
+                        TONE_TEXT[markTone(percent)],
+                      )}
+                    >
+                      {formatMark(submission.score ?? 0)}
+                    </span>
+                    <span className="font-mono text-[16px] text-ink-4 tnum">
+                      / {submission.out_of ?? test.max_marks}
+                    </span>
+                    <span className="ml-1 font-mono text-[14px] text-ink-3 tnum">
+                      {formatPercent(percent)}
+                    </span>
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1.5">
+                  {submission.overridden ? <Badge tone="neutral">Edited by you</Badge> : null}
+                  {submission.needs_review ? (
+                    <Badge tone="warn" icon={<IconAlert size={11} />}>
+                      Wants a second look
+                    </Badge>
+                  ) : null}
+                  {submission.file_name ? (
+                    <span className="inline-flex items-center gap-1.5 font-mono text-[11.5px] text-ink-4">
+                      <IconFile size={11} />
+                      {submission.file_name}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+
+              {submission.error_message ? (
+                <p className="mt-3 rounded-md border border-warn-line bg-warn-soft px-2.5 py-1.5 text-[12.5px] leading-snug text-warn">
+                  {submission.error_message}
+                </p>
+              ) : null}
+
+              <label className="mt-4 block">
                 <span className="mb-1.5 block text-[12.5px] font-medium text-ink-2">
                   Override the mark
                 </span>
                 <Input
                   type="number"
                   min={0}
-                  max={submission.outOf ?? test.maxMarks}
+                  max={submission.out_of ?? test.max_marks}
                   step={0.5}
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
@@ -187,47 +305,49 @@ export function ResultSheet({
                 />
               </label>
             </div>
+
+            {submission.summary ? (
+              <div className="border-b border-line px-5 py-4">
+                <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">
+                  <IconSparkle size={11} />
+                  Summary
+                </p>
+                <p className="text-[13.5px] leading-relaxed text-ink-2">{submission.summary}</p>
+              </div>
+            ) : null}
+
+            {submission.questions.length > 0 ? (
+              <div>
+                <p className="px-5 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">
+                  Question by question
+                </p>
+                <ul className="divide-y divide-line border-t border-line">
+                  {submission.questions.map((question) => {
+                    const ratio = question.out_of > 0 ? (question.awarded / question.out_of) * 100 : 0;
+                    return (
+                      <li key={question.number} className="flex gap-3 px-5 py-3">
+                        <span className="w-8 shrink-0 pt-0.5 font-mono text-[12.5px] font-medium text-ink-3">
+                          {question.number}
+                        </span>
+                        <p className="flex-1 text-[13px] leading-relaxed text-ink-2">
+                          {question.note}
+                        </p>
+                        <span
+                          className={cx(
+                            "shrink-0 pt-0.5 font-mono text-[13px] font-medium tnum",
+                            TONE_TEXT[markTone(ratio)],
+                          )}
+                        >
+                          {formatMark(question.awarded)}
+                          <span className="text-ink-4">/{formatMark(question.out_of)}</span>
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
           </div>
-
-          {submission.summary ? (
-            <div className="border-b border-line px-5 py-4">
-              <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">
-                <IconSparkle size={11} />
-                Summary
-              </p>
-              <p className="text-[13.5px] leading-relaxed text-ink-2">{submission.summary}</p>
-            </div>
-          ) : null}
-
-          {submission.questions && submission.questions.length > 0 ? (
-            <div>
-              <p className="px-5 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">
-                Question by question
-              </p>
-              <ul className="divide-y divide-line border-t border-line">
-                {submission.questions.map((question) => {
-                  const ratio = question.outOf > 0 ? (question.awarded / question.outOf) * 100 : 0;
-                  return (
-                    <li key={question.number} className="flex gap-3 px-5 py-3">
-                      <span className="w-8 shrink-0 pt-0.5 font-mono text-[12.5px] font-medium text-ink-3">
-                        {question.number}
-                      </span>
-                      <p className="flex-1 text-[13px] leading-relaxed text-ink-2">{question.note}</p>
-                      <span
-                        className={cx(
-                          "shrink-0 pt-0.5 font-mono text-[13px] font-medium tnum",
-                          TONE_TEXT[markTone(ratio)],
-                        )}
-                      >
-                        {formatMark(question.awarded)}
-                        <span className="text-ink-4">/{formatMark(question.outOf)}</span>
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ) : null}
         </div>
       ) : null}
     </Sheet>

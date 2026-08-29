@@ -104,6 +104,11 @@ export const IconEyeOff = make(
   "IconEyeOff",
 );
 
+export const IconRefresh = make(
+  <><path d="M20 11.5a8 8 0 1 0-.9 5" /><path d="M20 4.5v5h-5" /></>,
+  "IconRefresh",
+);
+
 export function Spinner({ size = 14, className = "" }: { size?: number; className?: string }) {
   return (
     <svg

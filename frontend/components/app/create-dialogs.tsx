@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button, Field, Input, Select, Textarea, cx } from "@/components/ui/primitives";
 import { Dialog, useToast } from "@/components/ui/overlays";
 import { IconPlus, IconSparkle, IconX } from "@/components/ui/icons";
-import { createClassroom, createTest } from "@/lib/store";
+import { createClassroom, createTest } from "@/lib/workspace";
 import { todayISO } from "@/lib/format";
 import type { Classroom } from "@/lib/types";
 
@@ -123,12 +123,21 @@ export function CreateClassroomDialog({ open, onClose }: { open: boolean; onClos
     }
   }, [open]);
 
-  function submit() {
-    if (!name.trim()) return;
-    const classroom = createClassroom({ name, description, subjects });
-    onClose();
-    toast(`${classroom.name} created`, "success");
-    router.push(`/app/${classroom.slug}`);
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (!name.trim() || busy) return;
+    setBusy(true);
+    try {
+      const classroom = await createClassroom({ name, description, subjects });
+      onClose();
+      toast(`${classroom.name} created`, "success");
+      router.push(`/app/${classroom.slug}`);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not create that classroom", "error");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -142,7 +151,13 @@ export function CreateClassroomDialog({ open, onClose }: { open: boolean; onClos
           <Button size="sm" onClick={onClose}>
             Cancel
           </Button>
-          <Button size="sm" variant="primary" onClick={submit} disabled={!name.trim()}>
+          <Button
+            size="sm"
+            variant="primary"
+            loading={busy}
+            onClick={() => void submit()}
+            disabled={!name.trim()}
+          >
             Create classroom
           </Button>
         </>
@@ -152,7 +167,7 @@ export function CreateClassroomDialog({ open, onClose }: { open: boolean; onClos
         className="grid gap-4"
         onSubmit={(event) => {
           event.preventDefault();
-          submit();
+          void submit();
         }}
       >
         <Field label="Classroom name">
@@ -208,18 +223,27 @@ export function CreateTestDialog({
 
   const marks = useMemo(() => Number(maxMarks) || 100, [maxMarks]);
 
-  function submit() {
-    if (!classroom || !date) return;
-    const test = createTest(classroom.id, {
-      date,
-      subjectId: subjectId || undefined,
-      title: title || undefined,
-      instructions: instructions || undefined,
-      maxMarks: marks,
-    });
-    onClose();
-    toast("Test created — upload answers when you're ready", "success");
-    router.push(`/app/${classroom.slug}/tests/${test.id}`);
+  const [saving, setSaving] = useState(false);
+
+  async function submit() {
+    if (!classroom || !date || saving) return;
+    setSaving(true);
+    try {
+      const test = await createTest(classroom, {
+        test_date: date,
+        subject_id: subjectId || undefined,
+        title: title || undefined,
+        instructions: instructions || undefined,
+        max_marks: marks,
+      });
+      onClose();
+      toast("Test created — upload answer sheets when you're ready", "success");
+      router.push(`/app/${classroom.slug}/tests/${test.id}`);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not create that test", "error");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -234,7 +258,13 @@ export function CreateTestDialog({
           <Button size="sm" onClick={onClose}>
             Cancel
           </Button>
-          <Button size="sm" variant="primary" onClick={submit} disabled={!date}>
+          <Button
+            size="sm"
+            variant="primary"
+            loading={saving}
+            onClick={() => void submit()}
+            disabled={!date}
+          >
             Create test
           </Button>
         </>
@@ -244,7 +274,7 @@ export function CreateTestDialog({
         className="grid gap-4"
         onSubmit={(event) => {
           event.preventDefault();
-          submit();
+          void submit();
         }}
       >
         <div className="grid gap-4 sm:grid-cols-2">

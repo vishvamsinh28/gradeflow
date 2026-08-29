@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { Badge, Button, EmptyState, cx } from "@/components/ui/primitives";
 import {
+  IconAlert,
   IconArrowRight,
   IconCalendar,
   IconLayers,
@@ -12,18 +13,19 @@ import {
   IconUsers,
 } from "@/components/ui/icons";
 import { NewClassroomButton, PageHeader, useWorkspaceActions } from "@/components/app/shell";
-import { classroomSummary, testProgress, useDatabase } from "@/lib/store";
+import { useAuth } from "@/components/app/auth-provider";
+import { testProgress, useClassrooms } from "@/lib/workspace";
 import { formatPercent, greeting, pluralize, relativeDay } from "@/lib/format";
 import type { Classroom } from "@/lib/types";
 
 export default function DashboardPage() {
-  const db = useDatabase();
+  const { data: classrooms, loading, error, reload } = useClassrooms();
   const { newClassroom } = useWorkspaceActions();
+  const { user } = useAuth();
+  const firstName = user?.fullName.trim().split(/\s+/)[0] ?? "there";
 
-  const totalStudents = db.classrooms.reduce(
-    (sum, classroom) => sum + classroom.students.length,
-    0,
-  );
+  const rooms = classrooms ?? [];
+  const totalStudents = rooms.reduce((sum, classroom) => sum + classroom.students.length, 0);
 
   /** Only real, actionable work lands here — never a metric for its own sake. */
   const attention = useMemo(() => {
@@ -35,9 +37,14 @@ export default function DashboardPage() {
       tone: "warn" | "accent" | "neutral";
     }[] = [];
 
-    db.classrooms.forEach((classroom) => {
+    rooms.forEach((classroom) => {
       classroom.tests.forEach((test) => {
-        const progress = testProgress(db, classroom, test);
+        const progress = testProgress(
+          test,
+          classroom.students,
+          classroom.submissions,
+          classroom.attendance,
+        );
         const name = test.title ?? "Untitled test";
 
         if (test.status === "grading") {
@@ -78,21 +85,46 @@ export default function DashboardPage() {
       });
     });
 
-    // Work you can act on right now floats to the top; reviews sit below it.
     const rank = { accent: 0, warn: 1, neutral: 2 } as const;
     return items.sort((a, b) => rank[a.tone] - rank[b.tone]).slice(0, 5);
-  }, [db]);
+  }, [rooms]);
+
+  if (error) {
+    return (
+      <div className="mx-auto w-full max-w-[1360px] px-4 py-8 sm:px-6">
+        <EmptyState
+          icon={<IconAlert size={17} />}
+          title="Could not load your classrooms"
+          description={error}
+          action={<Button variant="primary" onClick={() => void reload()}>Try again</Button>}
+        />
+      </div>
+    );
+  }
+
+  if (loading && !classrooms) {
+    return (
+      <div className="mx-auto w-full max-w-[1360px] px-4 py-10 sm:px-6">
+        <div className="skeleton h-7 w-52 rounded-md" />
+        <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {[0, 1, 2].map((index) => (
+            <div key={index} className="skeleton h-[172px] rounded-xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-[1360px] px-4 py-8 sm:px-6 sm:py-10">
       <PageHeader
-        title={`${greeting()}, ${db.teacherName}`}
+        title={`${greeting()}, ${firstName}`}
         subtitle={
-          db.classrooms.length === 0
+          rooms.length === 0
             ? "Start by creating your first classroom."
-            : `${pluralize(db.classrooms.length, "classroom")} · ${pluralize(totalStudents, "student")}`
+            : `${pluralize(rooms.length, "classroom")} · ${pluralize(totalStudents, "student")}`
         }
-        actions={db.classrooms.length > 0 ? <NewClassroomButton /> : undefined}
+        actions={rooms.length > 0 ? <NewClassroomButton /> : undefined}
       />
 
       {attention.length > 0 ? (
@@ -139,7 +171,7 @@ export default function DashboardPage() {
           Classrooms
         </h2>
 
-        {db.classrooms.length === 0 ? (
+        {rooms.length === 0 ? (
           <div className="mt-2.5 rounded-xl border border-dashed border-line-strong bg-surface">
             <EmptyState
               icon={<IconLayers size={17} />}
@@ -154,7 +186,7 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="mt-2.5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {db.classrooms.map((classroom) => (
+            {rooms.map((classroom) => (
               <ClassroomCard key={classroom.id} classroom={classroom} />
             ))}
             <button
@@ -174,13 +206,19 @@ export default function DashboardPage() {
 }
 
 function ClassroomCard({ classroom }: { classroom: Classroom }) {
-  const db = useDatabase();
-  const summary = classroomSummary(db, classroom);
+  const latest = [...classroom.tests].sort((a, b) => b.test_date.localeCompare(a.test_date))[0];
+  const latestProgress = latest
+    ? testProgress(latest, classroom.students, classroom.submissions, classroom.attendance)
+    : null;
+  const latestSubject = latest
+    ? classroom.subjects.find((subject) => subject.id === latest.subject_id)?.name
+    : undefined;
+  const needsReview = classroom.submissions.filter((s) => s.needs_review).length;
 
   return (
     <Link
       href={`/app/${classroom.slug}`}
-      className="group flex min-h-[172px] flex-col rounded-xl border border-line bg-surface p-4 transition-[border-color,box-shadow] hover:border-line-strong hover:shadow-[0_1px_2px_rgba(26,26,23,0.04),0_8px_24px_-16px_rgba(26,26,23,0.2)]"
+      className="group flex min-h-[172px] flex-col rounded-xl border border-line bg-surface p-4 transition-[border-color,box-shadow] hover:border-line-strong hover:shadow-[0_1px_2px_rgba(0,0,0,0.2)]"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -191,9 +229,7 @@ function ClassroomCard({ classroom }: { classroom: Classroom }) {
             <p className="mt-0.5 line-clamp-1 text-[12.5px] text-ink-3">{classroom.description}</p>
           ) : null}
         </div>
-        {summary.needsReview > 0 ? (
-          <Badge tone="warn">{summary.needsReview} to review</Badge>
-        ) : null}
+        {needsReview > 0 ? <Badge tone="warn">{needsReview} to review</Badge> : null}
       </div>
 
       <div className="mt-3 flex items-center gap-3.5 text-[12.5px] text-ink-2">
@@ -212,23 +248,21 @@ function ClassroomCard({ classroom }: { classroom: Classroom }) {
       </div>
 
       <div className="mt-auto pt-4">
-        {summary.latest ? (
+        {latest ? (
           <div className="rounded-lg border border-line bg-surface-2/60 px-3 py-2">
             <div className="flex items-baseline justify-between gap-2">
               <span className="truncate text-[12.5px] font-medium text-ink-2">
-                {summary.latest.title ?? "Untitled test"}
+                {latest.title ?? "Untitled test"}
               </span>
               <span className="shrink-0 font-mono text-[12px] text-ink-3 tnum">
-                {relativeDay(summary.latest.date)}
+                {relativeDay(latest.test_date)}
               </span>
             </div>
             <div className="mt-1 flex items-baseline justify-between gap-2">
-              <span className="text-[12px] text-ink-3">
-                {summary.latestSubject ?? "No subject"}
-              </span>
-              {summary.latestAverage !== null ? (
+              <span className="text-[12px] text-ink-3">{latestSubject ?? "No subject"}</span>
+              {latestProgress?.averagePercent !== null && latestProgress ? (
                 <span className="font-mono text-[12.5px] font-medium text-ink tnum">
-                  {formatPercent(summary.latestAverage)} avg
+                  {formatPercent(latestProgress.averagePercent)} avg
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 text-[12px] text-ink-3">

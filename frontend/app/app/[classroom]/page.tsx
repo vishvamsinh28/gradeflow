@@ -4,29 +4,36 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { Avatar, Button, EmptyState, Input, cx } from "@/components/ui/primitives";
-import { useConfirm } from "@/components/ui/overlays";
+import { useConfirm, useToast } from "@/components/ui/overlays";
 import { IconCalendar, IconLayers, IconPlus, IconTrash } from "@/components/ui/icons";
 import { useWorkspaceActions } from "@/components/app/shell";
 import { TestRow } from "@/components/app/test-bits";
-import {
-  addSubject,
-  classroomSummary,
-  removeSubject,
-  renameSubject,
-  useClassroom,
-  useDatabase,
-} from "@/lib/store";
+import { GradeScaleCard } from "@/components/app/grade-scale";
+import { addSubject, removeSubject, renameSubject, testProgress, useClassroom } from "@/lib/workspace";
 import { formatPercent, pluralize } from "@/lib/format";
+import type { Classroom } from "@/lib/types";
 
 export default function ClassroomOverviewPage() {
   const params = useParams<{ classroom: string }>();
-  const db = useDatabase();
-  const classroom = useClassroom(params.classroom);
+  const { data: classroom } = useClassroom(params.classroom);
   const { newTest, addStudents } = useWorkspaceActions();
 
   if (!classroom) return null;
-  const summary = classroomSummary(db, classroom);
-  const recentTests = [...classroom.tests].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
+
+  const graded = classroom.tests.filter((test) => test.status === "graded").length;
+  const averages = classroom.tests
+    .map((test) =>
+      testProgress(test, classroom.students, classroom.submissions, classroom.attendance)
+        .averagePercent,
+    )
+    .filter((value): value is number => value !== null);
+  const classAverage = averages.length
+    ? averages.reduce((sum, value) => sum + value, 0) / averages.length
+    : null;
+
+  const recentTests = [...classroom.tests]
+    .sort((a, b) => b.test_date.localeCompare(a.test_date))
+    .slice(0, 6);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_310px]">
@@ -34,11 +41,8 @@ export default function ClassroomOverviewPage() {
         <div className="mb-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-4">
           <Stat label="Students" value={String(classroom.students.length)} />
           <Stat label="Subjects" value={String(classroom.subjects.length)} />
-          <Stat
-            label="Tests graded"
-            value={`${summary.gradedCount}/${classroom.tests.length}`}
-          />
-          <Stat label="Class average" value={formatPercent(summary.average)} />
+          <Stat label="Tests graded" value={`${graded}/${classroom.tests.length}`} />
+          <Stat label="Class average" value={formatPercent(classAverage)} />
         </div>
 
         <section>
@@ -78,7 +82,8 @@ export default function ClassroomOverviewPage() {
       </div>
 
       <div className="space-y-6">
-        <SubjectsPanel classroomId={classroom.id} />
+        <SubjectsPanel classroom={classroom} />
+        <GradeScaleCard classroom={classroom} />
 
         <section>
           <div className="mb-2.5 flex items-center justify-between">
@@ -144,22 +149,24 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SubjectsPanel({ classroomId }: { classroomId: string }) {
-  const db = useDatabase();
+function SubjectsPanel({ classroom }: { classroom: Classroom }) {
   const confirm = useConfirm();
-  const classroom = db.classrooms.find((item) => item.id === classroomId);
+  const toast = useToast();
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
 
-  if (!classroom) return null;
-
-  function submit() {
-    if (!draft.trim()) {
+  async function submit() {
+    const name = draft.trim();
+    setDraft("");
+    if (!name) {
       setAdding(false);
       return;
     }
-    addSubject(classroomId, draft);
-    setDraft("");
+    try {
+      await addSubject(classroom, name);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not add that subject", "error");
+    }
   }
 
   async function remove(subjectId: string, name: string) {
@@ -169,7 +176,12 @@ function SubjectsPanel({ classroomId }: { classroomId: string }) {
       confirmLabel: "Remove subject",
       danger: true,
     });
-    if (ok) removeSubject(classroomId, subjectId);
+    if (!ok) return;
+    try {
+      await removeSubject(classroom, subjectId);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not remove that subject", "error");
+    }
   }
 
   return (
@@ -198,15 +210,16 @@ function SubjectsPanel({ classroomId }: { classroomId: string }) {
         ) : (
           <ul className="divide-y divide-line">
             {classroom.subjects.map((subject) => {
-              const count = classroom.tests.filter((test) => test.subjectId === subject.id).length;
+              const count = classroom.tests.filter((test) => test.subject_id === subject.id).length;
               return (
                 <li key={subject.id} className="group/subject flex items-center gap-2 px-3 py-2">
                   <input
                     defaultValue={subject.name}
                     aria-label={`Rename ${subject.name}`}
                     onBlur={(event) => {
-                      if (event.target.value.trim() && event.target.value !== subject.name) {
-                        renameSubject(classroomId, subject.id, event.target.value);
+                      const next = event.target.value.trim();
+                      if (next && next !== subject.name) {
+                        void renameSubject(classroom, subject.id, next);
                       } else {
                         event.target.value = subject.name;
                       }
@@ -243,9 +256,9 @@ function SubjectsPanel({ classroomId }: { classroomId: string }) {
               value={draft}
               placeholder="Subject name"
               onChange={(event) => setDraft(event.target.value)}
-              onBlur={submit}
+              onBlur={() => void submit()}
               onKeyDown={(event) => {
-                if (event.key === "Enter") submit();
+                if (event.key === "Enter") void submit();
                 if (event.key === "Escape") {
                   setDraft("");
                   setAdding(false);

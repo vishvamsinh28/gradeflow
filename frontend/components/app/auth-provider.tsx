@@ -10,12 +10,11 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { AUTH_MODE, currentUser, signOut as endSession, type User } from "@/lib/auth";
+import { currentUser, signOut as endSession, type User } from "@/lib/auth";
 
 type AuthState = {
   user: User | null;
   status: "loading" | "authenticated" | "anonymous";
-  mode: typeof AUTH_MODE;
   setUser: (user: User) => void;
   signOut: () => Promise<void>;
 };
@@ -23,7 +22,6 @@ type AuthState = {
 const AuthContext = createContext<AuthState>({
   user: null,
   status: "loading",
-  mode: AUTH_MODE,
   setUser: () => {},
   signOut: async () => {},
 });
@@ -62,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [router]);
 
   const value = useMemo<AuthState>(
-    () => ({ user, status, mode: AUTH_MODE, setUser, signOut }),
+    () => ({ user, status, setUser, signOut }),
     [user, status, setUser, signOut],
   );
 

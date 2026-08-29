@@ -7,7 +7,7 @@ import { IconPlus, IconSearch, IconUsers } from "@/components/ui/icons";
 import { useWorkspaceActions } from "@/components/app/shell";
 import { StudentSheet } from "@/components/app/student-sheet";
 import { SortHeader, TD, TH, compareValues, nextSort, type SortDirection } from "@/components/app/table";
-import { attendanceOf, useClassroom, useDatabase } from "@/lib/store";
+import { attendanceOf, useClassroom } from "@/lib/workspace";
 import { formatPercent, markTone, pluralize } from "@/lib/format";
 import type { Student } from "@/lib/types";
 
@@ -24,8 +24,7 @@ const TONE_TEXT = {
 export default function StudentsPage() {
   const params = useParams<{ classroom: string }>();
   const searchParams = useSearchParams();
-  const db = useDatabase();
-  const classroom = useClassroom(params.classroom);
+  const { data: classroom } = useClassroom(params.classroom);
   const { addStudents } = useWorkspaceActions();
 
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
@@ -40,19 +39,19 @@ export default function StudentsPage() {
     return classroom.students.map((student) => {
       const percents = classroom.tests
         .map((test) => {
-          const submission = db.submissions.find(
+          const submission = classroom.submissions.find(
             (item) =>
-              item.testId === test.id &&
-              item.studentId === student.id &&
+              item.test_id === test.id &&
+              item.student_id === student.id &&
               item.status === "graded",
           );
-          if (!submission?.outOf) return null;
-          return ((submission.score ?? 0) / submission.outOf) * 100;
+          if (!submission?.out_of) return null;
+          return ((submission.score ?? 0) / submission.out_of) * 100;
         })
         .filter((value): value is number => value !== null);
 
       const present = classroom.tests.filter(
-        (test) => attendanceOf(db, test.id, student.id) === "present",
+        (test) => attendanceOf(classroom.attendance, test.id, student.id) === "present",
       ).length;
 
       return {
@@ -66,7 +65,7 @@ export default function StudentsPage() {
           classroom.tests.length > 0 ? (present / classroom.tests.length) * 100 : null,
       };
     });
-  }, [classroom, db]);
+  }, [classroom]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -75,7 +74,7 @@ export default function StudentsPage() {
           (row) =>
             row.student.name.toLowerCase().includes(q) ||
             row.student.code.toLowerCase().includes(q) ||
-            (row.student.rollNo ?? "").toLowerCase().includes(q),
+            (row.student.roll_no ?? "").toLowerCase().includes(q),
         )
       : rows;
 
@@ -198,7 +197,7 @@ export default function StudentsPage() {
                     </td>
                     <td className={cx(TD, "whitespace-nowrap font-mono text-[12px] text-ink-3")}>{student.code}</td>
                     <td className={cx(TD, "font-mono text-[12px] text-ink-3")}>
-                      {student.rollNo ?? "—"}
+                      {student.roll_no ?? "—"}
                     </td>
                     <td className={cx(TD, "text-right font-mono text-[12.5px] text-ink-2 tnum")}>
                       {graded}

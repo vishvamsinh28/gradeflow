@@ -8,7 +8,7 @@ import { IconAlert, IconEye, IconEyeOff, Logo } from "@/components/ui/icons";
 import { NightPanel } from "./night-panel";
 import { useAuth } from "@/components/app/auth-provider";
 import {
-  AUTH_MODE,
+  apiConfigured,
   AuthError,
   signIn,
   signUp,
@@ -176,11 +176,10 @@ export function AuthScreen({ mode }: { mode: Mode }) {
                 </Link>
               </p>
 
-              {AUTH_MODE === "local" ? (
-                <p className="mt-8 rounded-md border border-line bg-surface-2 px-3 py-2.5 text-[12px] leading-relaxed text-ink-3">
-                  No API is configured, so this account and its workspace live in this browser
-                  only. Set <code className="font-mono text-ink-2">NEXT_PUBLIC_API_URL</code> to
-                  sign in against the GradeFlow server instead.
+              {!apiConfigured() ? (
+                <p className="mt-8 rounded-md border border-warn-line bg-warn-soft px-3 py-2.5 text-[12px] leading-relaxed text-warn">
+                  No API is configured, so nothing can be saved. Set{" "}
+                  <code className="font-mono">NEXT_PUBLIC_API_URL</code> and restart the app.
                 </p>
               ) : null}
             </div>

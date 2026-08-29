@@ -19,6 +19,8 @@ dependencies = [
   "python-multipart>=0.0.20,<1",
   "google-genai>=1.20,<2",
   "langgraph>=1.0,<2",
+  # Splitting a scanned class into one PDF per student.
+  "pypdf>=5.1,<7",
 ]
 
 [project.optional-dependencies]

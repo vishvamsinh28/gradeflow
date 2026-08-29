@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Badge, Progress, cx } from "@/components/ui/primitives";
 import { IconAlert, IconArrowRight, Spinner } from "@/components/ui/icons";
 import { formatPercent, relativeDay } from "@/lib/format";
-import { testProgress, useDatabase } from "@/lib/store";
+import { testProgress } from "@/lib/workspace";
 import type { Classroom, Test, TestProgress } from "@/lib/types";
 
 export function testState(test: Test, progress: TestProgress) {
@@ -45,9 +45,8 @@ export function TestStatusBadge({ test, progress }: { test: Test; progress: Test
 }
 
 export function TestRow({ classroom, test }: { classroom: Classroom; test: Test }) {
-  const db = useDatabase();
-  const progress = testProgress(db, classroom, test);
-  const subject = classroom.subjects.find((item) => item.id === test.subjectId);
+  const progress = testProgress(test, classroom.students, classroom.submissions, classroom.attendance);
+  const subject = classroom.subjects.find((item) => item.id === test.subject_id);
   const percentDone =
     progress.expected > 0 ? (progress.graded / progress.expected) * 100 : 0;
 
@@ -74,7 +73,7 @@ export function TestRow({ classroom, test }: { classroom: Classroom; test: Test 
         <div className="mt-0.5 flex items-center gap-1.5 text-[12.5px] text-ink-3">
           <span className="truncate">{subject?.name ?? "No subject"}</span>
           <span className="text-ink-4">·</span>
-          <span className="shrink-0 tnum">{relativeDay(test.date)}</span>
+          <span className="shrink-0 tnum">{relativeDay(test.test_date)}</span>
           {progress.absent > 0 ? (
             <>
               <span className="text-ink-4">·</span>

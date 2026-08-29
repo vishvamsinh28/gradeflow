@@ -28,30 +28,30 @@ import {
   IconFile,
   IconMinusCircle,
   IconMore,
+  IconRefresh,
   IconSparkle,
   IconTrash,
   IconUpload,
   IconX,
   Spinner,
 } from "@/components/ui/icons";
-import { BulkUploadDialog } from "@/components/app/bulk-upload-dialog";
+import { Dropzone } from "@/components/app/dropzone";
+import { RegradeDialog } from "@/components/app/regrade-dialog";
 import { ResultSheet } from "@/components/app/result-sheet";
 import { TestStatusBadge } from "@/components/app/test-bits";
 import {
-  attachSubmissions,
-  attendanceOf,
-  deleteTest,
+  gradeTest,
   removeSubmission,
-  setAllAttendance,
+  removeTest,
   setAttendance,
-  startGrading,
   testProgress,
   updateTest,
+  uploadSheets,
   useClassroom,
-  useDatabase,
-} from "@/lib/store";
+  useTestWorkspace,
+} from "@/lib/workspace";
 import { formatDate, formatMark, formatPercent, markTone, pluralize } from "@/lib/format";
-import type { Student, Submission } from "@/lib/types";
+import type { Student, Submission, UploadOutcome } from "@/lib/types";
 
 type RowFilter = "all" | "awaiting" | "ready" | "graded" | "review" | "absent";
 
@@ -67,30 +67,36 @@ export default function TestWorkspacePage() {
   const params = useParams<{ classroom: string; testId: string }>();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const db = useDatabase();
-  const classroom = useClassroom(params.classroom);
   const confirm = useConfirm();
   const toast = useToast();
+
+  const { data: workspace, loading, reload } = useTestWorkspace(params.testId);
+  const { data: classroom } = useClassroom(params.classroom);
 
   const [filter, setFilter] = useState<RowFilter>(
     (searchParams.get("filter") as RowFilter) ?? "all",
   );
-  const [bulkOpen, setBulkOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [openResult, setOpenResult] = useState<Submission | null>(null);
+  const [regradeOpen, setRegradeOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [outcome, setOutcome] = useState<UploadOutcome | null>(null);
+  const [openResultId, setOpenResultId] = useState<string | null>(null);
 
-  const test = classroom?.tests.find((item) => item.id === params.testId);
+  const test = workspace?.test;
+  const students = useMemo(() => workspace?.students ?? [], [workspace]);
+  const submissions = useMemo(() => workspace?.submissions ?? [], [workspace]);
+  const attendance = useMemo(() => workspace?.attendance ?? [], [workspace]);
 
-  const rows = useMemo(() => {
-    if (!classroom || !test) return [];
-    return classroom.students.map((student) => {
-      const submission = db.submissions.find(
-        (item) => item.testId === test.id && item.studentId === student.id,
-      );
-      const absent = attendanceOf(db, test.id, student.id) === "absent";
-      return { student, submission, absent };
-    });
-  }, [classroom, db, test]);
+  const rows = useMemo(
+    () =>
+      students.map((student) => ({
+        student,
+        submission: submissions.find((item) => item.student_id === student.id),
+        absent:
+          attendance.find((row) => row.student_id === student.id)?.mark === "absent",
+      })),
+    [students, submissions, attendance],
+  );
 
   const visible = useMemo(
     () =>
@@ -105,7 +111,7 @@ export default function TestWorkspacePage() {
           case "graded":
             return row.submission?.status === "graded";
           case "review":
-            return row.submission?.status === "graded" && row.submission.needsReview;
+            return row.submission?.status === "graded" && row.submission.needs_review;
           default:
             return true;
         }
@@ -113,12 +119,6 @@ export default function TestWorkspacePage() {
     [rows, filter],
   );
 
-  // Keep the open result sheet in step with the store while grading runs.
-  const liveResult = openResult
-    ? (db.submissions.find((item) => item.id === openResult.id) ?? null)
-    : null;
-
-  /** Stepping through results follows the filter the teacher is looking at. */
   const stepList = useMemo(
     () =>
       visible
@@ -126,20 +126,30 @@ export default function TestWorkspacePage() {
         .filter((item): item is Submission => item?.status === "graded"),
     [visible],
   );
-  const stepIndex = liveResult
-    ? stepList.findIndex((item) => item.id === liveResult.id)
-    : -1;
+  const liveResult = openResultId
+    ? (submissions.find((item) => item.id === openResultId) ?? null)
+    : null;
+  const stepIndex = liveResult ? stepList.findIndex((item) => item.id === liveResult.id) : -1;
 
   const stepResult = useCallback(
     (direction: -1 | 1) => {
       if (stepIndex < 0 || stepList.length === 0) return;
       const next = (stepIndex + direction + stepList.length) % stepList.length;
-      setOpenResult(stepList[next]);
+      setOpenResultId(stepList[next].id);
     },
     [stepIndex, stepList],
   );
 
-  if (!classroom || !test) {
+  if (loading && !workspace) {
+    return (
+      <div>
+        <div className="skeleton h-7 w-64 rounded-md" />
+        <div className="skeleton mt-6 h-96 rounded-xl" />
+      </div>
+    );
+  }
+
+  if (!workspace || !test || !classroom) {
     return (
       <EmptyState
         title="Test not found"
@@ -153,39 +163,62 @@ export default function TestWorkspacePage() {
     );
   }
 
-  const progress = testProgress(db, classroom, test);
-  const subject = classroom.subjects.find((item) => item.id === test.subjectId);
+  const progress = testProgress(test, students, submissions, attendance);
+  const subject = classroom.subjects.find((item) => item.id === test.subject_id);
   const ungraded = rows.filter(
     (row) => row.submission?.status === "awaiting" || row.submission?.status === "failed",
   ).length;
-  const busy = test.status === "grading";
+  const gradedCount = rows.filter((row) => row.submission?.status === "graded").length;
+  const busy =
+    test.status === "grading" ||
+    submissions.some((item) => item.status === "queued" || item.status === "grading");
 
   const counts: Record<RowFilter, number> = {
     all: rows.length,
     awaiting: rows.filter((row) => !row.absent && !row.submission).length,
     ready: rows.filter((row) => !row.absent && row.submission?.status === "awaiting").length,
-    graded: rows.filter((row) => row.submission?.status === "graded").length,
-    review: rows.filter((row) => row.submission?.needsReview).length,
+    graded: gradedCount,
+    review: rows.filter((row) => row.submission?.needs_review).length,
     absent: rows.filter((row) => row.absent).length,
   };
 
+  async function upload(files: File[]) {
+    if (!test) return;
+    setUploading(true);
+    setOutcome(null);
+    try {
+      const result = await uploadSheets(test.id, files);
+      setOutcome(result);
+      const count = result.submissions.length;
+      toast(
+        count > 0
+          ? `${pluralize(count, "sheet")} uploaded — grading now`
+          : "No sheets could be matched to a student",
+        count > 0 ? "success" : "error",
+      );
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not upload those sheets", "error");
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function remove() {
-    if (!classroom || !test) return;
+    if (!test || !classroom) return;
     const ok = await confirm({
       title: "Delete this test?",
-      body: "Every submission, mark and attendance record for it is removed.",
+      body: "Every answer sheet, mark and attendance record for it is removed from the server.",
       confirmLabel: "Delete test",
       danger: true,
     });
     if (!ok) return;
-    deleteTest(classroom.id, test.id);
-    router.push(`/app/${classroom.slug}/tests`);
-    toast("Test deleted", "success");
-  }
-
-  function grade() {
-    if (!classroom || !test) return;
-    void startGrading(classroom.id, test.id);
+    try {
+      await removeTest(test.id, classroom.slug);
+      router.push(`/app/${classroom.slug}/tests`);
+      toast("Test deleted", "success");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not delete that test", "error");
+    }
   }
 
   return (
@@ -206,24 +239,26 @@ export default function TestWorkspacePage() {
           <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-ink-3">
             <span>{subject?.name ?? "No subject"}</span>
             <span className="text-ink-4">·</span>
-            <span>{formatDate(test.date)}</span>
+            <span>{formatDate(test.test_date)}</span>
             <span className="text-ink-4">·</span>
-            <span className="tnum">{test.maxMarks} marks</span>
+            <span className="tnum">{test.max_marks} marks</span>
             <TestStatusBadge test={test} progress={progress} />
           </p>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <Button size="sm" icon={<IconUpload size={14} />} onClick={() => setBulkOpen(true)}>
-            Upload answers
-          </Button>
+          {gradedCount > 0 ? (
+            <Button size="sm" icon={<IconRefresh size={14} />} onClick={() => setRegradeOpen(true)}>
+              Re-mark
+            </Button>
+          ) : null}
           <Button
             size="sm"
             variant="primary"
             loading={busy}
             disabled={ungraded === 0 || busy}
             icon={busy ? undefined : <IconSparkle size={14} />}
-            onClick={grade}
+            onClick={() => void gradeTest(test.id).then(reload)}
           >
             {busy ? "Grading…" : ungraded > 0 ? `Grade ${ungraded}` : "Nothing to grade"}
           </Button>
@@ -257,25 +292,16 @@ export default function TestWorkspacePage() {
                   icon={<IconCheck size={14} />}
                   onClick={() => {
                     close();
-                    setAllAttendance(
+                    void setAttendance(
                       test.id,
-                      classroom.students.map((student) => student.id),
-                      "present",
-                    );
-                    toast("Everyone marked present", "success");
+                      students.map((student) => ({ student_id: student.id, mark: "present" as const })),
+                    ).then(() => toast("Everyone marked present", "success"));
                   }}
                 >
                   Mark all present
                 </MenuItem>
                 <MenuSeparator />
-                <MenuItem
-                  danger
-                  icon={<IconTrash size={14} />}
-                  onClick={() => {
-                    close();
-                    void remove();
-                  }}
-                >
+                <MenuItem danger icon={<IconTrash size={14} />} onClick={() => { close(); void remove(); }}>
                   Delete test
                 </MenuItem>
               </>
@@ -287,13 +313,41 @@ export default function TestWorkspacePage() {
       {test.instructions ? (
         <div className="mt-4 flex items-start gap-2 rounded-lg border border-line bg-surface px-3.5 py-2.5">
           <IconSparkle size={14} className="mt-[2px] shrink-0 text-accent" />
-          <p className="flex-1 text-[13px] leading-relaxed text-ink-2">{test.instructions}</p>
+          <p className="flex-1 whitespace-pre-line text-[13px] leading-relaxed text-ink-2">
+            {test.instructions}
+          </p>
           <button
             onClick={() => setEditOpen(true)}
             className="shrink-0 text-[12.5px] font-medium text-ink-3 transition-colors hover:text-accent"
           >
             Edit
           </button>
+        </div>
+      ) : null}
+
+      {counts.awaiting > 0 || submissions.length === 0 ? (
+        <div className="mt-4">
+          <Dropzone
+            multiple
+            accept="image/*,application/pdf"
+            disabled={uploading}
+            onFiles={upload}
+            title={uploading ? "Uploading and reading the sheets…" : "Drop the answer sheets"}
+            hint="One file per student, or a single PDF holding the whole class — it is split by reading the name on each page."
+            icon={uploading ? <Spinner size={16} /> : undefined}
+          />
+        </div>
+      ) : null}
+
+      {outcome && outcome.unmatched.length > 0 ? (
+        <div className="mt-3 rounded-lg border border-warn-line bg-warn-soft px-3.5 py-2.5">
+          <p className="text-[13px] font-medium text-warn">
+            {pluralize(outcome.unmatched.length, "sheet")} could not be matched to a student
+          </p>
+          <p className="mt-1 text-[12.5px] leading-snug text-warn/90">
+            {outcome.unmatched.join(", ")} — upload these against a student directly, using the
+            Upload button on their row. Nothing was guessed at.
+          </p>
         </div>
       ) : null}
 
@@ -304,7 +358,7 @@ export default function TestWorkspacePage() {
               {busy ? <Spinner size={13} /> : <IconSparkle size={13} />}
               {busy
                 ? `Grading ${progress.submitted} submissions…`
-                : `${progress.submitted - progress.graded} submissions waiting to be graded`}
+                : `${progress.submitted - progress.graded} waiting to be graded`}
             </p>
             <span className="font-mono text-[12.5px] text-accent tnum">
               {progress.graded}/{progress.submitted}
@@ -345,34 +399,15 @@ export default function TestWorkspacePage() {
             </span>
           </button>
         ))}
-
-        <div className="ml-auto">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() =>
-              setAllAttendance(
-                test.id,
-                classroom.students.map((student) => student.id),
-                "present",
-              )
-            }
-          >
-            Mark all present
-          </Button>
-        </div>
       </div>
 
       <div className="mt-2.5 overflow-hidden rounded-xl border border-line bg-surface">
-        {classroom.students.length === 0 ? (
+        {students.length === 0 ? (
           <EmptyState
             title="No students in this classroom"
             description="Add students before collecting answers."
             action={
-              <Button
-                variant="primary"
-                onClick={() => router.push(`/app/${classroom.slug}/students`)}
-              >
+              <Button variant="primary" onClick={() => router.push(`/app/${classroom.slug}/students`)}>
                 Add students
               </Button>
             }
@@ -388,12 +423,9 @@ export default function TestWorkspacePage() {
                 submission={submission}
                 absent={absent}
                 testId={test.id}
-                maxMarks={test.maxMarks}
-                onOpen={() => submission?.status === "graded" && setOpenResult(submission)}
-                onUpload={(fileName) => {
-                  attachSubmissions(test.id, [{ studentId: student.id, fileName }]);
-                  void startGrading(classroom.id, test.id);
-                }}
+                maxMarks={test.max_marks}
+                onOpen={() => submission?.status === "graded" && setOpenResultId(submission.id)}
+                onUpload={(files) => void upload(files)}
               />
             ))}
           </ul>
@@ -409,30 +441,27 @@ export default function TestWorkspacePage() {
           : "Marks appear here as grading finishes."}
       </p>
 
-      <BulkUploadDialog
-        open={bulkOpen}
-        onClose={() => setBulkOpen(false)}
-        classroom={classroom}
-        test={test}
-        onConfirm={(entries) => {
-          attachSubmissions(test.id, entries);
-          toast(`${pluralize(entries.length, "sheet")} uploaded — grading now`, "success");
-          void startGrading(classroom.id, test.id);
-        }}
+      <RegradeDialog
+        open={regradeOpen}
+        onClose={() => setRegradeOpen(false)}
+        testId={test.id}
+        gradedCount={gradedCount}
+        flaggedCount={counts.review}
       />
 
       <EditTestDialog
         open={editOpen}
         onClose={() => setEditOpen(false)}
-        classroomId={classroom.id}
-        testId={test.id}
+        slug={classroom.slug}
+        test={test}
+        subjects={classroom.subjects}
       />
 
       <ResultSheet
         submission={liveResult}
-        student={classroom.students.find((item) => item.id === liveResult?.studentId)}
+        student={students.find((item) => item.id === liveResult?.student_id)}
         test={test}
-        onClose={() => setOpenResult(null)}
+        onClose={() => setOpenResultId(null)}
         onStep={stepResult}
         position={stepIndex >= 0 ? { index: stepIndex, total: stepList.length } : undefined}
       />
@@ -440,7 +469,7 @@ export default function TestWorkspacePage() {
   );
 }
 
-/* ---------- Roster row ---------- */
+/* ---------- roster row ---------- */
 
 function RosterRow({
   student,
@@ -457,24 +486,16 @@ function RosterRow({
   testId: string;
   maxMarks: number;
   onOpen: () => void;
-  onUpload: (fileName: string) => void;
+  onUpload: (files: File[]) => void;
 }) {
   const graded = submission?.status === "graded";
   const percent =
-    graded && submission.outOf ? ((submission.score ?? 0) / submission.outOf) * 100 : null;
+    graded && submission.out_of ? ((submission.score ?? 0) / submission.out_of) * 100 : null;
 
-  /* Attendance and the answer sheet sit inline on desktop and drop to a second
-     line on a phone — never hidden, since a phone is where sheets get
-     photographed. */
   const controls = (
     <>
       <AttendanceToggle testId={testId} studentId={student.id} absent={absent} locked={graded} />
-      <AnswerCell
-        student={student}
-        submission={submission}
-        absent={absent}
-        onUpload={onUpload}
-      />
+      <AnswerCell student={student} submission={submission} absent={absent} testId={testId} onUpload={onUpload} />
     </>
   );
 
@@ -489,7 +510,6 @@ function RosterRow({
     >
       <div className="flex items-center gap-3">
         <Avatar name={student.name} size={26} />
-
         <div className="min-w-0 flex-[1.4]">
           <p className={cx("truncate text-[13.5px] font-medium", absent ? "text-ink-3" : "text-ink")}>
             {student.name}
@@ -512,9 +532,7 @@ function RosterRow({
           size={14}
           className={cx(
             "shrink-0 transition-all",
-            graded
-              ? "text-ink-4 group-hover/row:translate-x-0.5 group-hover/row:text-ink-2"
-              : "opacity-0",
+            graded ? "text-ink-4 group-hover/row:translate-x-0.5 group-hover/row:text-ink-2" : "opacity-0",
           )}
         />
       </div>
@@ -556,14 +574,14 @@ function ResultCell({
   if (graded && submission) {
     return (
       <>
-        {submission.needsReview ? (
+        {submission.needs_review ? (
           <span title="Wants a second look" className="text-warn">
             <IconAlert size={13} />
           </span>
         ) : null}
         <span className={cx("font-mono text-[13.5px] font-medium tnum", TONE_TEXT[markTone(percent)])}>
           {formatMark(submission.score ?? 0)}
-          <span className="text-ink-4">/{submission.outOf ?? maxMarks}</span>
+          <span className="text-ink-4">/{submission.out_of ?? maxMarks}</span>
         </span>
       </>
     );
@@ -576,35 +594,40 @@ function AnswerCell({
   student,
   submission,
   absent,
+  testId,
   onUpload,
 }: {
   student: Student;
   submission: Submission | undefined;
   absent: boolean;
-  onUpload: (fileName: string) => void;
+  testId: string;
+  onUpload: (files: File[]) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const toast = useToast();
 
-  if (absent) {
-    return <span className="text-[12.5px] text-ink-4">No sheet expected</span>;
-  }
+  if (absent) return <span className="text-[12.5px] text-ink-4">No sheet expected</span>;
 
   if (submission) {
     return (
       <span className="flex min-w-0 items-center gap-1.5">
         <IconFile size={13} className="shrink-0 text-ink-4" />
         <span className="truncate font-mono text-[11.5px] text-ink-3">
-          {submission.fileName ?? "answer"}
+          {submission.file_name ?? "answer"}
         </span>
-        {submission.matchedByAI ? (
-          <span title="Matched to this student by AI" className="shrink-0 text-accent">
+        {submission.matched_by_ai ? (
+          <span title="Matched to this student by reading the sheet" className="shrink-0 text-accent">
             <IconSparkle size={11} />
           </span>
         ) : null}
         {submission.status === "awaiting" ? (
           <button
             aria-label="Remove this answer sheet"
-            onClick={() => removeSubmission(submission.id)}
+            onClick={() =>
+              void removeSubmission(testId, submission.id).catch(() =>
+                toast("Could not remove that sheet", "error"),
+              )
+            }
             className="shrink-0 text-ink-4 transition-opacity hover:text-danger sm:opacity-0 sm:focus-visible:opacity-100 sm:group-hover/row:opacity-100"
           >
             <IconX size={12} />
@@ -624,7 +647,7 @@ function AnswerCell({
         aria-label={`Upload an answer sheet for ${student.name}`}
         onChange={(event) => {
           const file = event.target.files?.[0];
-          if (file) onUpload(file.name);
+          if (file) onUpload([file]);
           event.target.value = "";
         }}
       />
@@ -650,12 +673,18 @@ function AttendanceToggle({
   absent: boolean;
   locked: boolean;
 }) {
+  const toast = useToast();
+  const set = (mark: "present" | "absent") =>
+    void setAttendance(testId, [{ student_id: studentId, mark }]).catch(() =>
+      toast("Could not save attendance", "error"),
+    );
+
   return (
     <div className="inline-flex overflow-hidden rounded-md border border-line" role="group">
       <button
         aria-label="Mark present"
         aria-pressed={!absent}
-        onClick={() => setAttendance(testId, studentId, "present")}
+        onClick={() => set("present")}
         className={cx(
           "flex h-6 w-7 items-center justify-center transition-colors",
           !absent ? "bg-accent text-accent-on" : "bg-surface text-ink-4 hover:bg-surface-2 hover:text-ink-2",
@@ -668,7 +697,7 @@ function AttendanceToggle({
         aria-pressed={absent}
         disabled={locked}
         title={locked ? "This answer is already graded" : undefined}
-        onClick={() => setAttendance(testId, studentId, "absent")}
+        onClick={() => set("absent")}
         className={cx(
           "flex h-6 w-7 items-center justify-center border-l border-line transition-colors disabled:cursor-not-allowed disabled:opacity-40",
           absent ? "bg-danger text-danger-on" : "bg-surface text-ink-4 hover:bg-surface-2 hover:text-ink-2",
@@ -680,51 +709,55 @@ function AttendanceToggle({
   );
 }
 
-/* ---------- Edit test ---------- */
+/* ---------- edit ---------- */
 
 function EditTestDialog({
   open,
   onClose,
-  classroomId,
-  testId,
+  slug,
+  test,
+  subjects,
 }: {
   open: boolean;
   onClose: () => void;
-  classroomId: string;
-  testId: string;
+  slug: string;
+  test: { id: string; title: string | null; test_date: string; subject_id: string | null; max_marks: number; instructions: string | null };
+  subjects: { id: string; name: string }[];
 }) {
-  const db = useDatabase();
   const toast = useToast();
-  const classroom = db.classrooms.find((item) => item.id === classroomId);
-  const test = classroom?.tests.find((item) => item.id === testId);
-
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [subjectId, setSubjectId] = useState("");
   const [maxMarks, setMaxMarks] = useState("100");
   const [instructions, setInstructions] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!open || !test) return;
+    if (!open) return;
     setTitle(test.title ?? "");
-    setDate(test.date);
-    setSubjectId(test.subjectId ?? "");
-    setMaxMarks(String(test.maxMarks));
+    setDate(test.test_date);
+    setSubjectId(test.subject_id ?? "");
+    setMaxMarks(String(test.max_marks));
     setInstructions(test.instructions ?? "");
   }, [open, test]);
 
-  if (!classroom || !test) return null;
-
-  function save() {
-    updateTest(classroomId, testId, {
-      title: title.trim() || undefined,
-      date,
-      subjectId: subjectId || undefined,
-      maxMarks: Number(maxMarks) || 100,
-      instructions: instructions.trim() || undefined,
-    });
-    onClose();
-    toast("Test updated", "success");
+  async function save() {
+    setSaving(true);
+    try {
+      await updateTest(test.id, slug, {
+        title: title.trim() || undefined,
+        test_date: date,
+        subject_id: subjectId || null,
+        max_marks: Number(maxMarks) || 100,
+        instructions: instructions.trim() || undefined,
+      });
+      onClose();
+      toast("Test updated", "success");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not save those changes", "error");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -738,7 +771,7 @@ function EditTestDialog({
           <Button size="sm" onClick={onClose}>
             Cancel
           </Button>
-          <Button size="sm" variant="primary" onClick={save}>
+          <Button size="sm" variant="primary" loading={saving} onClick={() => void save()}>
             Save
           </Button>
         </>
@@ -752,7 +785,7 @@ function EditTestDialog({
           <Field label="Subject" optional>
             <Select value={subjectId} onChange={(event) => setSubjectId(event.target.value)}>
               <option value="">No subject</option>
-              {classroom.subjects.map((subject) => (
+              {subjects.map((subject) => (
                 <option key={subject.id} value={subject.id}>
                   {subject.name}
                 </option>

@@ -13,7 +13,7 @@ import {
   IconUsers,
 } from "@/components/ui/icons";
 import { formatDateShort } from "@/lib/format";
-import { useDatabase } from "@/lib/store";
+import { useClassrooms } from "@/lib/workspace";
 import type { Classroom } from "@/lib/types";
 
 type Command = {
@@ -41,7 +41,7 @@ export function CommandPalette({
   onAddStudents: () => void;
 }) {
   const router = useRouter();
-  const db = useDatabase();
+  const { data: classrooms } = useClassrooms();
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
@@ -110,7 +110,7 @@ export function CommandPalette({
       );
     }
 
-    db.classrooms.forEach((item) => {
+    (classrooms ?? []).forEach((item) => {
       list.push({
         id: `class-${item.id}`,
         label: item.name,
@@ -121,12 +121,12 @@ export function CommandPalette({
       });
     });
 
-    db.classrooms.forEach((item) => {
+    (classrooms ?? []).forEach((item) => {
       item.tests.forEach((test) => {
         list.push({
           id: `test-${test.id}`,
           label: test.title ?? "Untitled test",
-          hint: `${item.name} · ${formatDateShort(test.date)}`,
+          hint: `${item.name} · ${formatDateShort(test.test_date)}`,
           group: "Tests",
           icon: <IconCalendar size={15} />,
           run: go(`/app/${item.slug}/tests/${test.id}`),
@@ -148,7 +148,7 @@ export function CommandPalette({
     }
 
     return list;
-  }, [db, classroom, router, onClose, onNewClassroom, onNewTest, onAddStudents]);
+  }, [classrooms, classroom, router, onClose, onNewClassroom, onNewTest, onAddStudents]);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();

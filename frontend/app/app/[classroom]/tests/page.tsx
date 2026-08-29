@@ -6,15 +6,14 @@ import { Button, EmptyState, Segmented, Select } from "@/components/ui/primitive
 import { IconCalendar, IconPlus } from "@/components/ui/icons";
 import { useWorkspaceActions } from "@/components/app/shell";
 import { TestRow, testState } from "@/components/app/test-bits";
-import { testProgress, useClassroom, useDatabase } from "@/lib/store";
+import { testProgress, useClassroom } from "@/lib/workspace";
 import { pluralize } from "@/lib/format";
 
 type Filter = "all" | "open" | "graded";
 
 export default function TestsPage() {
   const params = useParams<{ classroom: string }>();
-  const db = useDatabase();
-  const classroom = useClassroom(params.classroom);
+  const { data: classroom } = useClassroom(params.classroom);
   const { newTest } = useWorkspaceActions();
 
   const [filter, setFilter] = useState<Filter>("all");
@@ -23,23 +22,23 @@ export default function TestsPage() {
   const tests = useMemo(() => {
     if (!classroom) return [];
     return [...classroom.tests]
-      .sort((a, b) => b.date.localeCompare(a.date))
+      .sort((a, b) => b.test_date.localeCompare(a.test_date))
       .filter((test) => {
-        if (subjectId && test.subjectId !== subjectId) return false;
+        if (subjectId && test.subject_id !== subjectId) return false;
         if (filter === "all") return true;
-        const progress = testProgress(db, classroom, test);
+        const progress = testProgress(test, classroom.students, classroom.submissions, classroom.attendance);
         const done =
           test.status !== "grading" &&
           progress.graded > 0 &&
           progress.graded >= progress.expected;
         return filter === "graded" ? done : !done;
       });
-  }, [classroom, db, filter, subjectId]);
+  }, [classroom, filter, subjectId]);
 
   if (!classroom) return null;
 
   const openCount = classroom.tests.filter((test) => {
-    const progress = testProgress(db, classroom, test);
+    const progress = testProgress(test, classroom.students, classroom.submissions, classroom.attendance);
     return !(test.status !== "grading" && progress.graded > 0 && progress.graded >= progress.expected);
   }).length;
 
@@ -115,7 +114,7 @@ export default function TestsPage() {
           {filter !== "all" || subjectId ? " matching your filters" : ""}.{" "}
           {(() => {
             const needsWork = tests.filter((test) => {
-              const state = testState(test, testProgress(db, classroom, test));
+              const state = testState(test, testProgress(test, classroom.students, classroom.submissions, classroom.attendance));
               return state.tone !== "accent" || state.busy;
             }).length;
             if (needsWork === 0) return "All caught up.";

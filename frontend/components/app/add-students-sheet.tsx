@@ -11,13 +11,12 @@ import {
   Spinner,
 } from "@/components/ui/icons";
 import { Dropzone } from "./dropzone";
-import { extractRoster } from "@/lib/ai";
 import { parseRoster, type ParsedStudent } from "@/lib/parse";
-import { addStudents } from "@/lib/store";
+import { addStudents } from "@/lib/workspace";
 import { pluralize } from "@/lib/format";
 import type { Classroom } from "@/lib/types";
 
-type Mode = "paste" | "file" | "ai";
+type Mode = "paste" | "file";
 
 const PLACEHOLDER = `Rahul Sharma
 Priya Patel
@@ -68,21 +67,19 @@ export function AddStudentsSheet({
   const duplicates = review?.filter((student) => existing.has(student.name.toLowerCase())).length ?? 0;
   const importable = (review?.length ?? 0) - duplicates;
 
-  async function readFiles(files: File[], viaAI: boolean) {
+  async function readFiles(files: File[]) {
     const file = files[0];
     if (!file) return;
     setBusy(true);
     try {
-      if (viaAI) {
-        const result = await extractRoster(file);
-        setReview(result.students);
-        setNote(result.note);
-      } else {
-        const text = await file.text();
-        const students = parseRoster(text);
-        setReview(students);
-        setNote(`Read ${pluralize(students.length, "student")} from ${file.name}.`);
+      const text = await file.text();
+      const students = parseRoster(text);
+      if (students.length === 0) {
+        toast("No names found in that file — try a CSV, or paste the list", "error");
+        return;
       }
+      setReview(students);
+      setNote(`Read ${pluralize(students.length, "student")} from ${file.name}.`);
     } catch {
       toast("Could not read that file", "error");
     } finally {
@@ -90,16 +87,26 @@ export function AddStudentsSheet({
     }
   }
 
-  function commit() {
+  async function commit() {
     if (!classroom || !review) return;
-    const added = addStudents(classroom.id, review);
-    onClose();
-    toast(
-      added === 0
-        ? "Everyone on that list is already in this classroom"
-        : `Added ${added} ${added === 1 ? "student" : "students"}`,
-      added === 0 ? "info" : "success",
-    );
+    setBusy(true);
+    try {
+      const added = await addStudents(
+        classroom,
+        review.map((student) => ({ name: student.name, roll_no: student.rollNo })),
+      );
+      onClose();
+      toast(
+        added === 0
+          ? "Everyone on that list is already in this classroom"
+          : `Added ${added} ${added === 1 ? "student" : "students"}`,
+        added === 0 ? "info" : "success",
+      );
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not add those students", "error");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -118,7 +125,7 @@ export function AddStudentsSheet({
             <Button size="sm" onClick={() => setReview(null)}>
               Back
             </Button>
-            <Button size="sm" variant="primary" onClick={commit} disabled={importable === 0}>
+            <Button size="sm" variant="primary" loading={busy} onClick={() => void commit()} disabled={importable === 0}>
               Add {importable} {importable === 1 ? "student" : "students"}
             </Button>
           </>
@@ -158,8 +165,7 @@ export function AddStudentsSheet({
             className="mb-4"
             options={[
               { value: "paste", label: "Type or paste", icon: <IconUsers size={13} /> },
-              { value: "file", label: "Upload file", icon: <IconFile size={13} /> },
-              { value: "ai", label: "Extract with AI", icon: <IconSparkle size={13} /> },
+              { value: "file", label: "Upload a file", icon: <IconFile size={13} /> },
             ]}
           />
 
@@ -184,7 +190,7 @@ export function AddStudentsSheet({
           {mode === "file" ? (
             <Dropzone
               accept=".csv,.tsv,.txt"
-              onFiles={(files) => readFiles(files, false)}
+              onFiles={readFiles}
               disabled={busy}
               title={busy ? "Reading…" : "Drop a CSV file"}
               hint="CSV or TSV exported from your school system. Headers are detected automatically."
@@ -192,20 +198,6 @@ export function AddStudentsSheet({
             />
           ) : null}
 
-          {mode === "ai" ? (
-            <div>
-              <Dropzone
-                onFiles={(files) => readFiles(files, true)}
-                disabled={busy}
-                title={busy ? "Reading the list…" : "Drop anything with a student list"}
-                hint="A photo of the register, a PDF, a spreadsheet, a screenshot. GradeFlow reads the names off it."
-                icon={busy ? <Spinner size={16} /> : <IconSparkle size={16} />}
-              />
-              <p className="mt-3 text-[12.5px] leading-relaxed text-ink-3">
-                You will see every extracted name in a review table before anything is imported.
-              </p>
-            </div>
-          ) : null}
         </div>
       )}
     </Sheet>

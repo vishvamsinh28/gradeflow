@@ -23,7 +23,7 @@ import {
 import { CommandPalette } from "./command-palette";
 import { AddStudentsSheet } from "./add-students-sheet";
 import { CreateClassroomDialog, CreateTestDialog } from "./create-dialogs";
-import { clearWorkspace, useDatabase, useHydratedWorkspace } from "@/lib/store";
+import { clearCache, removeClassroom, useClassrooms } from "@/lib/workspace";
 import { AuthProvider, useAuth } from "./auth-provider";
 import type { Classroom } from "@/lib/types";
 
@@ -63,8 +63,7 @@ function ShellBody({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { user, status } = useAuth();
   const firstName = user?.fullName.trim().split(/\s+/)[0] ?? "there";
-  const hydrated = useHydratedWorkspace(user?.id ?? null, firstName);
-  const db = useDatabase();
+  const { data: classrooms, loading } = useClassrooms();
   const pathname = usePathname();
 
   // The workspace is per-account, so there is nothing to show without one.
@@ -77,7 +76,7 @@ function ShellBody({ children }: { children: ReactNode }) {
     return parts[0] === "app" ? parts[1] : undefined;
   }, [pathname]);
 
-  const classroom = db.classrooms.find((item) => item.slug === slug);
+  const classroom = classrooms?.find((item) => item.slug === slug);
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [classroomOpen, setClassroomOpen] = useState(false);
@@ -132,7 +131,7 @@ function ShellBody({ children }: { children: ReactNode }) {
       <div className="flex min-h-svh flex-col">
         <TopBar classroom={classroom} onSearch={() => setPaletteOpen(true)} />
         <main className="flex-1">
-          {status === "authenticated" && hydrated ? children : <ShellSkeleton />}
+          {status === "authenticated" && !(loading && !classrooms) ? children : <ShellSkeleton />}
         </main>
       </div>
 
@@ -154,7 +153,7 @@ function ShellBody({ children }: { children: ReactNode }) {
 /* ---------- Top bar ---------- */
 
 function TopBar({ classroom, onSearch }: { classroom?: Classroom; onSearch: () => void }) {
-  const db = useDatabase();
+  const { data: classrooms, reload } = useClassrooms();
   const router = useRouter();
   const confirm = useConfirm();
   const toast = useToast();
@@ -163,15 +162,20 @@ function TopBar({ classroom, onSearch }: { classroom?: Classroom; onSearch: () =
 
   async function clearAll() {
     const ok = await confirm({
-      title: "Clear this workspace?",
-      body: "Every classroom, test, mark and attendance record in your account is removed. This cannot be undone.",
-      confirmLabel: "Clear everything",
+      title: "Delete every classroom?",
+      body: "Every classroom, student, test, mark and answer sheet in your account is removed from the server. This cannot be undone.",
+      confirmLabel: "Delete everything",
       danger: true,
     });
     if (!ok) return;
-    clearWorkspace();
-    router.push("/app");
-    toast("Workspace cleared", "success");
+    try {
+      for (const item of classrooms ?? []) await removeClassroom(item.id);
+      await reload();
+      router.push("/app");
+      toast("Workspace cleared", "success");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not clear the workspace", "error");
+    }
   }
 
 
@@ -211,7 +215,7 @@ function TopBar({ classroom, onSearch }: { classroom?: Classroom; onSearch: () =
             >
               {(close) => (
                 <>
-                  {db.classrooms.map((item) => (
+                  {(classrooms ?? []).map((item) => (
                     <MenuItem
                       key={item.id}
                       onClick={() => {
@@ -294,6 +298,7 @@ function TopBar({ classroom, onSearch }: { classroom?: Classroom; onSearch: () =
                 icon={<IconLogout size={14} />}
                 onClick={() => {
                   close();
+                  clearCache();
                   void signOut();
                 }}
               >
