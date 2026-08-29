@@ -48,20 +48,20 @@ export function markTone(percent: number | null | undefined): "strong" | "fine" 
   return "low";
 }
 
+/** Tailwind class per mark band, so the scale is defined once. */
+export const MARK_TONE_CLASS: Record<ReturnType<typeof markTone>, string> = {
+  strong: "text-accent",
+  fine: "text-ink",
+  watch: "text-warn",
+  low: "text-danger",
+  none: "text-ink-4",
+};
+
 export function greeting(): string {
   const hour = new Date().getHours();
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
   return "Good evening";
-}
-
-export function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 48);
 }
 
 export function pluralize(count: number, singular: string, plural?: string): string {

@@ -14,11 +14,12 @@ import {
   MenuItem,
   MenuSeparator,
   Progress,
-  Select,
   Textarea,
   cx,
 } from "@/components/ui/primitives";
 import { Dialog, useConfirm, useToast } from "@/components/ui/overlays";
+import { Select } from "@/components/ui/select";
+import { DateField } from "@/components/ui/date-field";
 import {
   IconAlert,
   IconArrowRight,
@@ -47,21 +48,12 @@ import {
   testProgress,
   updateTest,
   uploadSheets,
-  useClassroom,
   useTestWorkspace,
 } from "@/lib/workspace";
-import { formatDate, formatMark, formatPercent, markTone, pluralize } from "@/lib/format";
+import { formatDate, formatMark, formatPercent, markTone, MARK_TONE_CLASS, pluralize } from "@/lib/format";
 import type { Student, Submission, UploadOutcome } from "@/lib/types";
 
 type RowFilter = "all" | "awaiting" | "ready" | "graded" | "review" | "absent";
-
-const TONE_TEXT = {
-  strong: "text-accent",
-  fine: "text-ink",
-  watch: "text-warn",
-  low: "text-danger",
-  none: "text-ink-4",
-} as const;
 
 export default function TestWorkspacePage() {
   const params = useParams<{ classroom: string; testId: string }>();
@@ -70,8 +62,10 @@ export default function TestWorkspacePage() {
   const confirm = useConfirm();
   const toast = useToast();
 
-  const { data: workspace, loading, reload } = useTestWorkspace(params.testId);
-  const { data: classroom } = useClassroom(params.classroom);
+  const { data: workspace, loading, error, reload } = useTestWorkspace(params.testId);
+  // /tests/{id} carries the classroom already; fetching it separately was both
+  // a wasted round trip and the reason this screen flashed "Test not found".
+  const classroom = workspace?.classroom;
 
   const [filter, setFilter] = useState<RowFilter>(
     (searchParams.get("filter") as RowFilter) ?? "all",
@@ -152,8 +146,8 @@ export default function TestWorkspacePage() {
   if (!workspace || !test || !classroom) {
     return (
       <EmptyState
-        title="Test not found"
-        description="It may have been deleted."
+        title={error ? "Could not load this test" : "Test not found"}
+        description={error ?? "It may have been deleted."}
         action={
           <Button variant="primary" onClick={() => router.push(`/app/${params.classroom}/tests`)}>
             Back to tests
@@ -579,7 +573,7 @@ function ResultCell({
             <IconAlert size={13} />
           </span>
         ) : null}
-        <span className={cx("font-mono text-[13.5px] font-medium tnum", TONE_TEXT[markTone(percent)])}>
+        <span className={cx("font-mono text-[13.5px] font-medium tnum", MARK_TONE_CLASS[markTone(percent)])}>
           {formatMark(submission.score ?? 0)}
           <span className="text-ink-4">/{submission.out_of ?? maxMarks}</span>
         </span>
@@ -780,17 +774,19 @@ function EditTestDialog({
       <div className="grid gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Test date">
-            <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+            <DateField aria-label="Test date" value={date} onChange={setDate} />
           </Field>
           <Field label="Subject" optional>
-            <Select value={subjectId} onChange={(event) => setSubjectId(event.target.value)}>
-              <option value="">No subject</option>
-              {subjects.map((subject) => (
-                <option key={subject.id} value={subject.id}>
-                  {subject.name}
-                </option>
-              ))}
-            </Select>
+            <Select
+              value={subjectId}
+              onChange={setSubjectId}
+              placeholder="No subject"
+              className="w-full"
+              options={[
+                { value: "", label: "No subject" },
+                ...(subjects ?? []).map((subject) => ({ value: subject.id, label: subject.name })),
+              ]}
+            />
           </Field>
         </div>
         <div className="grid gap-4 sm:grid-cols-[1fr_120px]">

@@ -9,6 +9,7 @@ import logging
 import re
 from datetime import UTC, datetime
 from typing import Any
+from uuid import uuid4
 
 from fastapi import (
     APIRouter,
@@ -38,6 +39,8 @@ from app.models.classroom_schemas import (
 )
 from app.services.grader import SheetGrader
 from app.services.sheets import (
+    MAX_FILES,
+    MAX_PDF_PAGES,
     SheetFile,
     SheetStorage,
     extract_pdf_pages,
@@ -132,6 +135,16 @@ def now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
+# Columns the browser has no use for. `storage_path` in particular describes the
+# private bucket's layout and embeds the owner's id — the client fetches sheets
+# through /sheets/{id}/file, never by path.
+SUBMISSION_PRIVATE = ("storage_path",)
+
+
+def submission_payload(row: dict) -> dict:
+    return {key: value for key, value in row.items() if key not in SUBMISSION_PRIVATE}
+
+
 def classroom_payload(db: Client, classroom: dict) -> dict:
     classroom_id = classroom["id"]
     subjects = (
@@ -147,7 +160,10 @@ def classroom_payload(db: Client, classroom: dict) -> dict:
     submissions: list[dict] = []
     attendance: list[dict] = []
     if test_ids:
-        submissions = db.table("test_submissions").select("*").in_("test_id", test_ids).execute().data
+        submissions = [
+            submission_payload(row)
+            for row in db.table("test_submissions").select("*").in_("test_id", test_ids).execute().data
+        ]
         attendance = db.table("test_attendance").select("*").in_("test_id", test_ids).execute().data
     return {
         **classroom,
@@ -330,6 +346,32 @@ def add_students(
     return db.table("classroom_students").insert(rows).execute().data
 
 
+@router.post("/classrooms/{classroom_id}/students/extract")
+async def extract_students(
+    classroom_id: str,
+    file: UploadFile = File(...),
+    user=Depends(get_current_user),
+    db: Client = Depends(get_supabase),
+):
+    """
+    Read a class register into a student list.
+
+    Nothing is written here — the teacher reviews and edits the names before
+    they go anywhere, so extraction stays a read and insertion keeps going
+    through add_students.
+    """
+    owned_classroom(db, classroom_id, user["id"])
+    content, mime = await read_upload(file)
+    try:
+        students = SheetGrader().read_roster(content, mime)
+    except Exception as error:  # noqa: BLE001 - surfaced to the teacher as a retryable failure
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not read that register: {error}",
+        ) from error
+    return {"students": students}
+
+
 @router.patch("/students/{student_id}")
 def update_student(
     student_id: str,
@@ -346,6 +388,27 @@ def update_student(
     if not update:
         return owned_student(db, student_id, user["id"])[0]
     return db.table("classroom_students").update(update).eq("id", student_id).execute().data[0]
+
+
+@router.post("/students/{student_id}/rotate-share-link")
+def rotate_share_link(
+    student_id: str, user=Depends(get_current_user), db: Client = Depends(get_supabase)
+):
+    """
+    Issue a new results link and invalidate the old one.
+
+    A results link exposes a child's marks to anyone holding it, so there has to
+    be a way to withdraw one that has been forwarded, posted, or lost.
+    """
+    owned_student(db, student_id, user["id"])
+    updated = (
+        db.table("classroom_students")
+        .update({"share_token": str(uuid4())})
+        .eq("id", student_id)
+        .execute()
+        .data[0]
+    )
+    return {"share_token": updated["share_token"]}
 
 
 @router.delete("/students/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -398,9 +461,21 @@ def get_test(test_id: str, user=Depends(get_current_user), db: Client = Depends(
     test, classroom = owned_test(db, test_id, user["id"])
     return {
         "test": test,
-        "classroom": classroom,
+        "classroom": {
+            **classroom,
+            "subjects": db.table("subjects")
+            .select("*")
+            .eq("classroom_id", classroom["id"])
+            .order("position")
+            .order("name")
+            .execute()
+            .data,
+        },
         "students": db.table("classroom_students").select("*").eq("classroom_id", classroom["id"]).order("code").execute().data,
-        "submissions": db.table("test_submissions").select("*").eq("test_id", test_id).execute().data,
+        "submissions": [
+            submission_payload(row)
+            for row in db.table("test_submissions").select("*").eq("test_id", test_id).execute().data
+        ],
         "attendance": db.table("test_attendance").select("*").eq("test_id", test_id).execute().data,
     }
 
@@ -538,6 +613,11 @@ async def upload_sheets(
     shape a document scanner or a phone scanning app actually gives you.
     """
     test, classroom = owned_test(db, test_id, user["id"])
+    if len(files) > MAX_FILES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"That is {len(files)} files. Upload at most {MAX_FILES} at a time.",
+        )
     students = _present_students(db, test_id, classroom["id"])
     if not students:
         raise HTTPException(status_code=400, detail="Every student is marked absent for this test")
@@ -553,6 +633,11 @@ async def upload_sheets(
         name = upload.filename or "sheet"
 
         pages = pdf_page_count(content) if mime == "application/pdf" else 1
+        if pages > MAX_PDF_PAGES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"{name} has {pages} pages. Split it into batches of {MAX_PDF_PAGES} or fewer.",
+            )
         if pages > 1 and len(files) == 1:
             # A whole class in one PDF: ask which name is on each page, group
             # continuation pages onto the sheet they belong to, then split.
@@ -607,7 +692,9 @@ async def upload_sheets(
             "updated_at": now_iso(),
         }
         created.append(
-            db.table("test_submissions").upsert(row, on_conflict="test_id,student_id").execute().data[0]
+            submission_payload(
+                db.table("test_submissions").upsert(row, on_conflict="test_id,student_id").execute().data[0]
+            )
         )
 
     if created:
@@ -681,7 +768,9 @@ def review_submission(
         update["needs_review"] = False
     if payload.accept:
         update["needs_review"] = False
-    return db.table("test_submissions").update(update).eq("id", submission_id).execute().data[0]
+    return submission_payload(
+        db.table("test_submissions").update(update).eq("id", submission_id).execute().data[0]
+    )
 
 
 # ---------- grading ----------
@@ -833,65 +922,3 @@ def grade_for(percent: float | None, scale: list[dict]) -> str | None:
         except (KeyError, TypeError, ValueError):
             continue
     return None
-
-
-@router.get("/classrooms/{classroom_id}/report")
-def classroom_report(
-    classroom_id: str, user=Depends(get_current_user), db: Client = Depends(get_supabase)
-):
-    """
-    The marks in the shape a teacher hands on: one row per student, a column per
-    subject, an average, a letter grade, and attendance.
-    """
-    classroom = owned_classroom(db, classroom_id, user["id"])
-    data = classroom_payload(db, classroom)
-    scale = classroom.get("grade_scale") or []
-
-    subject_of = {test["id"]: test.get("subject_id") for test in data["tests"]}
-    absent_count: dict[str, int] = {}
-    for row in data["attendance"]:
-        if row["mark"] == "absent":
-            absent_count[row["student_id"]] = absent_count.get(row["student_id"], 0) + 1
-
-    by_student: dict[str, list[tuple[str | None, float]]] = {}
-    for submission in data["submissions"]:
-        if submission["status"] != "graded" or not submission.get("out_of"):
-            continue
-        percent = float(submission["score"] or 0) / float(submission["out_of"]) * 100
-        by_student.setdefault(submission["student_id"], []).append(
-            (subject_of.get(submission["test_id"]), percent)
-        )
-
-    rows = []
-    for student in data["students"]:
-        marks = by_student.get(student["id"], [])
-        overall = round(sum(percent for _, percent in marks) / len(marks), 1) if marks else None
-        per_subject = {}
-        for subject in data["subjects"]:
-            values = [percent for subject_id, percent in marks if subject_id == subject["id"]]
-            per_subject[subject["id"]] = round(sum(values) / len(values), 1) if values else None
-        rows.append(
-            {
-                "student_id": student["id"],
-                "code": student["code"],
-                "name": student["name"],
-                "roll_no": student.get("roll_no"),
-                "share_token": student["share_token"],
-                "subjects": per_subject,
-                "average": overall,
-                "grade": grade_for(overall, scale),
-                "tests_taken": len(marks),
-                "absences": absent_count.get(student["id"], 0),
-            }
-        )
-
-    return {
-        "classroom": {
-            "id": classroom["id"],
-            "name": classroom["name"],
-            "grade_scale": scale,
-        },
-        "subjects": [{"id": s["id"], "name": s["name"]} for s in data["subjects"]],
-        "tests": len(data["tests"]),
-        "rows": rows,
-    }

@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Field, Input, Select, Textarea, cx } from "@/components/ui/primitives";
+import { Button, Field, Input, Textarea, cx } from "@/components/ui/primitives";
+import { Select } from "@/components/ui/select";
+import { DateField } from "@/components/ui/date-field";
 import { Dialog, useToast } from "@/components/ui/overlays";
 import { IconPlus, IconSparkle, IconX } from "@/components/ui/icons";
 import { createClassroom, createTest } from "@/lib/workspace";
@@ -279,22 +281,19 @@ export function CreateTestDialog({
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Test date">
-            <Input
-              data-autofocus
-              type="date"
-              value={date}
-              onChange={(event) => setDate(event.target.value)}
-            />
+            <DateField data-autofocus aria-label="Test date" value={date} onChange={setDate} />
           </Field>
           <Field label="Subject" optional>
-            <Select value={subjectId} onChange={(event) => setSubjectId(event.target.value)}>
-              <option value="">No subject</option>
-              {classroom?.subjects.map((subject) => (
-                <option key={subject.id} value={subject.id}>
-                  {subject.name}
-                </option>
-              ))}
-            </Select>
+            <Select
+              value={subjectId}
+              onChange={setSubjectId}
+              placeholder="No subject"
+              className="w-full"
+              options={[
+                { value: "", label: "No subject" },
+                ...(classroom?.subjects ?? []).map((subject) => ({ value: subject.id, label: subject.name })),
+              ]}
+            />
           </Field>
         </div>
 

@@ -11,7 +11,6 @@ import { authHeaders, AuthError } from "./auth";
 import { apiUrl } from "./runtime-config";
 import type {
   Classroom,
-  ClassroomReport,
   GradeBand,
   ShareResult,
   Student,
@@ -92,8 +91,6 @@ export const updateClassroom = (
 export const deleteClassroom = (id: string) =>
   request<void>(`/classrooms/${id}`, { method: "DELETE" });
 
-export const getReport = (id: string) => request<ClassroomReport>(`/classrooms/${id}/report`);
-
 /* ---------- subjects ---------- */
 
 export const createSubject = (classroomId: string, name: string) =>
@@ -125,6 +122,10 @@ export const updateStudent = (id: string, body: { name?: string; roll_no?: strin
   request<Student>(`/students/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 
 export const deleteStudent = (id: string) => request<void>(`/students/${id}`, { method: "DELETE" });
+
+/** Invalidates the old results link and returns a fresh token. */
+export const rotateShareLink = (id: string) =>
+  request<{ share_token: string }>(`/students/${id}/rotate-share-link`, { method: "POST" });
 
 /* ---------- tests ---------- */
 
@@ -162,6 +163,16 @@ export const setAttendance = (
     method: "POST",
     body: JSON.stringify({ entries }),
   });
+
+/** Read a photographed class register into a list the teacher can edit. */
+export function extractStudents(
+  classroomId: string,
+  file: File,
+): Promise<{ students: { name: string; roll_no: string | null }[] }> {
+  const form = new FormData();
+  form.append("file", file);
+  return request(`/classrooms/${classroomId}/students/extract`, { method: "POST", body: form });
+}
 
 /* ---------- answer sheets ---------- */
 

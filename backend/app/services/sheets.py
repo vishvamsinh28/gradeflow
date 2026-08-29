@@ -19,6 +19,10 @@ from supabase import Client
 
 BUCKET = "answer-sheets"
 MAX_BYTES = 25 * 1024 * 1024
+# One class at a time. Without these, a single request can pin the API and
+# fan out into thousands of model calls.
+MAX_FILES = 120
+MAX_PDF_PAGES = 400
 ALLOWED = {"image/jpeg", "image/png", "image/webp", "image/heic", "application/pdf"}
 
 

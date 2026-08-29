@@ -73,9 +73,10 @@ export type Classroom = {
   attendance: AttendanceRow[];
 };
 
+/** Everything the test screen needs, in one request. */
 export type TestWorkspace = {
   test: Test;
-  classroom: Classroom;
+  classroom: Pick<Classroom, "id" | "slug" | "name" | "grade_scale"> & { subjects: Subject[] };
   students: Student[];
   submissions: Submission[];
   attendance: AttendanceRow[];
@@ -86,24 +87,6 @@ export type UploadOutcome = {
   /** Sheets that could not be matched to a student — never guessed at. */
   unmatched: string[];
   awaiting_upload: { id: ID; name: string; code: string }[];
-};
-
-export type ClassroomReport = {
-  classroom: { id: ID; name: string; grade_scale: GradeBand[] };
-  subjects: { id: ID; name: string }[];
-  tests: number;
-  rows: {
-    student_id: ID;
-    code: string;
-    name: string;
-    roll_no: string | null;
-    share_token: string;
-    subjects: Record<ID, number | null>;
-    average: number | null;
-    grade: string | null;
-    tests_taken: number;
-    absences: number;
-  }[];
 };
 
 export type ShareResult = {

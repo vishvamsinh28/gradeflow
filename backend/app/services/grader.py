@@ -92,6 +92,44 @@ Rules:
             by_page[page] = name.strip() if isinstance(name, str) and name.strip() else None
         return [by_page.get(page) for page in range(1, page_count + 1)]
 
+    def read_roster(self, content: bytes, mime_type: str) -> list[dict[str, str | None]]:
+        """Pull a student list off a photographed or scanned class register."""
+        prompt = """
+This image or PDF is a class register — a list of students in one classroom.
+Read every student on it.
+
+Return JSON: {"students": [{"name": string, "roll_no": string|null}, ...]}
+
+Rules:
+- One entry per student, in the order they appear.
+- Copy names exactly as written. Do not correct spelling or reorder
+  first and last names.
+- roll_no is the roll number, admission number, or serial number beside the
+  name. Use null when the sheet has none.
+- Skip headers, totals, signatures, and anything that is not a student.
+""".strip()
+        data = self._json(
+            [
+                types.Part.from_text(text=prompt),
+                types.Part.from_bytes(data=content, mime_type=mime_type),
+            ]
+        )
+        students: list[dict[str, str | None]] = []
+        for entry in data.get("students") or []:
+            if not isinstance(entry, dict):
+                continue
+            name = entry.get("name")
+            if not isinstance(name, str) or not name.strip():
+                continue
+            roll = entry.get("roll_no")
+            students.append(
+                {
+                    "name": name.strip(),
+                    "roll_no": str(roll).strip() if roll not in (None, "") else None,
+                }
+            )
+        return students
+
     def grade(
         self,
         content: bytes,

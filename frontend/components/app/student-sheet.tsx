@@ -4,7 +4,7 @@ import { Avatar, Badge, Button, EmptyState, cx } from "@/components/ui/primitive
 import { Sheet, useConfirm, useToast } from "@/components/ui/overlays";
 import { IconCalendar, IconTrash } from "@/components/ui/icons";
 import { attendanceOf, removeStudent, updateStudent } from "@/lib/workspace";
-import { formatDateShort, formatMark, formatPercent, markTone } from "@/lib/format";
+import { formatDateShort, formatMark, formatPercent, markTone, MARK_TONE_CLASS } from "@/lib/format";
 import type { Classroom, Student } from "@/lib/types";
 
 const TONE_TEXT: Record<ReturnType<typeof markTone>, string> = {
@@ -183,7 +183,7 @@ export function StudentSheet({
                       </Badge>
                     ) : (
                       <div className="text-right">
-                        <p className={cx("font-mono text-[13.5px] font-medium tnum", TONE_TEXT[markTone(percent)])}>
+                        <p className={cx("font-mono text-[13.5px] font-medium tnum", MARK_TONE_CLASS[markTone(percent)])}>
                           {formatMark(submission?.score ?? 0)}
                           <span className="text-ink-4">/{submission?.out_of}</span>
                         </p>

@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { Button, EmptyState, Segmented, Select } from "@/components/ui/primitives";
+import { Button, EmptyState, Segmented } from "@/components/ui/primitives";
+import { Select } from "@/components/ui/select";
 import { IconCalendar, IconPlus } from "@/components/ui/icons";
 import { useWorkspaceActions } from "@/components/app/shell";
 import { TestRow, testState } from "@/components/app/test-bits";
@@ -56,17 +57,15 @@ export default function TestsPage() {
         />
         {classroom.subjects.length > 0 ? (
           <Select
+            aria-label="Filter by subject"
             value={subjectId}
-            onChange={(event) => setSubjectId(event.target.value)}
+            onChange={setSubjectId}
             className="h-8 w-auto min-w-[150px] text-[13px]"
-          >
-            <option value="">All subjects</option>
-            {classroom.subjects.map((subject) => (
-              <option key={subject.id} value={subject.id}>
-                {subject.name}
-              </option>
-            ))}
-          </Select>
+            options={[
+              { value: "", label: "All subjects" },
+              ...classroom.subjects.map((subject) => ({ value: subject.id, label: subject.name })),
+            ]}
+          />
         ) : null}
         <div className="ml-auto">
           <Button size="sm" variant="primary" icon={<IconPlus size={14} />} onClick={newTest}>

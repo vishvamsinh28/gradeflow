@@ -107,8 +107,14 @@ export function useClassroom(slug: string): Loadable<Classroom> {
   }, [slug]);
 
   useEffect(() => {
+    // Already cached from the dashboard list — no reason to fetch it again on
+    // every navigation. `reload()` is still there when freshness matters.
+    if (found) {
+      setLoading(false);
+      return;
+    }
     void reload();
-  }, [reload]);
+  }, [reload, found]);
 
   return { data: found, loading: loading && !found, error, reload };
 }

@@ -5,16 +5,8 @@ import { use } from "react";
 import { EmptyState, cx } from "@/components/ui/primitives";
 import { IconAlert, Logo, Spinner } from "@/components/ui/icons";
 import { fetchShared } from "@/lib/api";
-import { formatDate, formatMark, formatPercent, markTone } from "@/lib/format";
+import { formatDate, formatMark, formatPercent, markTone, MARK_TONE_CLASS } from "@/lib/format";
 import type { ShareResult } from "@/lib/types";
-
-const TONE_TEXT = {
-  strong: "text-accent",
-  fine: "text-ink",
-  watch: "text-warn",
-  low: "text-danger",
-  none: "text-ink-4",
-} as const;
 
 /**
  * A student's own marks, opened from a link their teacher sent.
@@ -86,7 +78,7 @@ export default function ResultsPage({ params }: { params: Promise<{ token: strin
                         <p
                           className={cx(
                             "font-mono text-[22px] font-medium tnum",
-                            TONE_TEXT[markTone(result.percent)],
+                            MARK_TONE_CLASS[markTone(result.percent)],
                           )}
                         >
                           {formatMark(result.score ?? 0)}

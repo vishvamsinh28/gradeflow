@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/primitives";
 import { useToast } from "@/components/ui/overlays";
-import { IconCheck, IconEye } from "@/components/ui/icons";
+import { IconCheck, IconEye, IconRefresh } from "@/components/ui/icons";
+import { rotateShareLink } from "@/lib/api";
 import type { Student } from "@/lib/types";
 
 export function shareUrl(token: string): string {
@@ -20,9 +21,24 @@ export function shareUrl(token: string): string {
 export function ShareLinkButton({ student }: { student: Student }) {
   const toast = useToast();
   const [copied, setCopied] = useState(false);
+  const [token, setToken] = useState(student.share_token);
+  const [rotating, setRotating] = useState(false);
+
+  async function rotate() {
+    setRotating(true);
+    try {
+      const result = await rotateShareLink(student.id);
+      setToken(result.share_token);
+      toast("Old link withdrawn — a new one has been issued", "success");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not withdraw that link", "error");
+    } finally {
+      setRotating(false);
+    }
+  }
 
   async function copy() {
-    const url = shareUrl(student.share_token);
+    const url = shareUrl(token);
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
@@ -35,12 +51,24 @@ export function ShareLinkButton({ student }: { student: Student }) {
   }
 
   return (
-    <Button
-      size="sm"
-      icon={copied ? <IconCheck size={14} /> : <IconEye size={14} />}
-      onClick={() => void copy()}
-    >
-      {copied ? "Link copied" : "Copy results link"}
-    </Button>
+    <span className="inline-flex items-center gap-1.5">
+      <Button
+        size="sm"
+        icon={copied ? <IconCheck size={14} /> : <IconEye size={14} />}
+        onClick={() => void copy()}
+      >
+        {copied ? "Link copied" : "Copy results link"}
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        loading={rotating}
+        icon={<IconRefresh size={14} />}
+        title="Withdraw the old link and issue a new one"
+        onClick={() => void rotate()}
+      >
+        Withdraw
+      </Button>
+    </span>
   );
 }

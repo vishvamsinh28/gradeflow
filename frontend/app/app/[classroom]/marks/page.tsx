@@ -2,26 +2,19 @@
 
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { Badge, Button, EmptyState, Input, Segmented, Select, cx } from "@/components/ui/primitives";
+import { Badge, Button, EmptyState, Input, Segmented, cx } from "@/components/ui/primitives";
+import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/ui/overlays";
 import { IconDownload, IconSearch, IconTable } from "@/components/ui/icons";
 import { StudentSheet } from "@/components/app/student-sheet";
 import { ShareLinkButton } from "@/components/app/share-link";
 import { SortHeader, TD, compareValues, nextSort, type SortDirection } from "@/components/app/table";
 import { attendanceOf, gradeFor, useClassroom } from "@/lib/workspace";
-import { formatDateShort, formatPercent, markTone, pluralize } from "@/lib/format";
+import { formatDateShort, formatPercent, markTone, MARK_TONE_CLASS, pluralize } from "@/lib/format";
 import type { Student } from "@/lib/types";
 
 type View = "subjects" | "tests";
 type AttendanceFilter = "any" | "present" | "absent";
-
-const TONE_TEXT = {
-  strong: "text-accent",
-  fine: "text-ink",
-  watch: "text-warn",
-  low: "text-danger",
-  none: "text-ink-4",
-} as const;
 
 export default function MarksPage() {
   const params = useParams<{ classroom: string }>();
@@ -213,46 +206,48 @@ export default function MarksPage() {
 
         {classroom.subjects.length > 0 ? (
           <Select
+            aria-label="Filter by subject"
             value={subjectId}
-            onChange={(event) => {
-              setSubjectId(event.target.value);
+            onChange={(next) => {
+              setSubjectId(next);
               setTestId("");
             }}
             className="h-8 min-w-[132px] flex-1 text-[13px] sm:w-auto sm:flex-none"
-          >
-            <option value="">All subjects</option>
-            {classroom.subjects.map((subject) => (
-              <option key={subject.id} value={subject.id}>
-                {subject.name}
-              </option>
-            ))}
-          </Select>
+            options={[
+              { value: "", label: "All subjects" },
+              ...classroom.subjects.map((subject) => ({ value: subject.id, label: subject.name })),
+            ]}
+          />
         ) : null}
 
         <Select
+          aria-label="Filter by test"
           value={testId}
-          onChange={(event) => setTestId(event.target.value)}
+          onChange={setTestId}
           className="h-8 min-w-[132px] flex-1 text-[13px] sm:w-auto sm:flex-none"
-        >
-          <option value="">All tests</option>
-          {classroom.tests
-            .filter((test) => (subjectId ? test.subject_id === subjectId : true))
-            .map((test) => (
-              <option key={test.id} value={test.id}>
-                {test.title ?? "Untitled"} · {formatDateShort(test.test_date)}
-              </option>
-            ))}
-        </Select>
+          options={[
+            { value: "", label: "All tests" },
+            ...classroom.tests
+              .filter((test) => (subjectId ? test.subject_id === subjectId : true))
+              .map((test) => ({
+                value: test.id,
+                label: test.title ?? "Untitled",
+                hint: formatDateShort(test.test_date),
+              })),
+          ]}
+        />
 
         <Select
+          aria-label="Filter by attendance"
           value={attendance}
-          onChange={(event) => setAttendance(event.target.value as AttendanceFilter)}
+          onChange={(next) => setAttendance(next as AttendanceFilter)}
           className="h-8 min-w-[132px] flex-1 text-[13px] sm:w-auto sm:flex-none"
-        >
-          <option value="any">Any attendance</option>
-          <option value="present">No absences</option>
-          <option value="absent">Has absences</option>
-        </Select>
+          options={[
+            { value: "any", label: "Any attendance" },
+            { value: "present", label: "No absences" },
+            { value: "absent", label: "Has absences" },
+          ]}
+        />
 
         <div className="ml-auto flex items-center gap-2">
           <span className="hidden text-[12.5px] text-ink-3 sm:inline">
@@ -394,7 +389,7 @@ export default function MarksPage() {
                           className={cx(
                             TD,
                             "text-right font-mono text-[13px] tnum",
-                            TONE_TEXT[markTone(value)],
+                            MARK_TONE_CLASS[markTone(value)],
                           )}
                         >
                           {value === null ? "—" : value.toFixed(0)}
@@ -405,7 +400,7 @@ export default function MarksPage() {
                       className={cx(
                         TD,
                         "border-l border-line bg-surface-2/40 text-right font-mono text-[13px] font-medium tnum",
-                        TONE_TEXT[markTone(row.average)],
+                        MARK_TONE_CLASS[markTone(row.average)],
                       )}
                     >
                       {row.average === null ? "—" : row.average.toFixed(1)}

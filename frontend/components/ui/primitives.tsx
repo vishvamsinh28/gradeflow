@@ -8,10 +8,9 @@ import {
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
-  type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
-import { IconChevronDown, Spinner } from "./icons";
+import { Spinner } from "./icons";
 
 export function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
@@ -111,26 +110,6 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(
   function Textarea({ className, ...props }, ref) {
     return <textarea ref={ref} className={cx(CONTROL, "resize-y py-2 leading-[1.55]", className)} {...props} />;
-  },
-);
-
-export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(
-  function Select({ className, children, ...props }, ref) {
-    return (
-      <div className="relative">
-        <select
-          ref={ref}
-          className={cx(CONTROL, "h-9 cursor-pointer appearance-none pr-8", className)}
-          {...props}
-        >
-          {children}
-        </select>
-        <IconChevronDown
-          size={14}
-          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-3"
-        />
-      </div>
-    );
   },
 );
 

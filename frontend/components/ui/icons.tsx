@@ -28,6 +28,7 @@ export const IconCheck = make(<path d="m4.5 12.5 5 5L19.5 7" />, "IconCheck");
 export const IconX = make(<><path d="M6 6l12 12" /><path d="M18 6L6 18" /></>, "IconX");
 export const IconChevronDown = make(<path d="m6 9 6 6 6-6" />, "IconChevronDown");
 export const IconChevronLeft = make(<path d="m15 6-6 6 6 6" />, "IconChevronLeft");
+export const IconChevronRight = make(<path d="m9 6 6 6-6 6" />, "IconChevronRight");
 export const IconArrowRight = make(<><path d="M4 12h15" /><path d="m13 6 6 6-6 6" /></>, "IconArrowRight");
 export const IconArrowUp = make(<><path d="M12 20V5" /><path d="m6 11 6-6 6 6" /></>, "IconArrowUp");
 export const IconArrowDown = make(<><path d="M12 4v15" /><path d="m18 13-6 6-6-6" /></>, "IconArrowDown");

@@ -20,9 +20,17 @@ export function resolveApiUrl(): string {
   return (process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "");
 }
 
-/** The <script> that hands the value to the browser. */
+/**
+ * The <script> that hands the value to the browser.
+ *
+ * JSON.stringify escapes quotes but not `</script>`, so a value containing one
+ * would close the tag and let whatever follows execute. Escaping `<` closes
+ * that off — the value is operator-supplied, but "only an operator can set it"
+ * is not a reason to emit unescaped markup.
+ */
 export function apiUrlScript(): string {
-  return `window.${GLOBAL_KEY}=${JSON.stringify(resolveApiUrl())}`;
+  const safe = JSON.stringify(resolveApiUrl()).replace(/</g, "\\u003c");
+  return `window.${GLOBAL_KEY}=${safe}`;
 }
 
 /** Client-side: whatever the server injected, falling back to build-time config. */

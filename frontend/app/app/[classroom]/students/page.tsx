@@ -8,18 +8,10 @@ import { useWorkspaceActions } from "@/components/app/shell";
 import { StudentSheet } from "@/components/app/student-sheet";
 import { SortHeader, TD, TH, compareValues, nextSort, type SortDirection } from "@/components/app/table";
 import { attendanceOf, useClassroom } from "@/lib/workspace";
-import { formatPercent, markTone, pluralize } from "@/lib/format";
+import { formatPercent, markTone, MARK_TONE_CLASS, pluralize } from "@/lib/format";
 import type { Student } from "@/lib/types";
 
 type SortKey = "name" | "code" | "graded" | "average" | "attendance";
-
-const TONE_TEXT = {
-  strong: "text-accent",
-  fine: "text-ink",
-  watch: "text-warn",
-  low: "text-danger",
-  none: "text-ink-4",
-} as const;
 
 export default function StudentsPage() {
   const params = useParams<{ classroom: string }>();
@@ -206,7 +198,7 @@ export default function StudentsPage() {
                       className={cx(
                         TD,
                         "text-right font-mono text-[13px] font-medium tnum",
-                        TONE_TEXT[markTone(average)],
+                        MARK_TONE_CLASS[markTone(average)],
                       )}
                     >
                       {formatPercent(average)}

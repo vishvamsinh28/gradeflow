@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { cx } from "@/components/ui/primitives";
 import { IconUpload } from "@/components/ui/icons";
 
@@ -25,6 +25,7 @@ export function Dropzone({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
+  const labelId = useId();
 
   function handle(list: FileList | null) {
     if (!list || list.length === 0) return;
@@ -32,7 +33,11 @@ export function Dropzone({
   }
 
   return (
-    <div
+    <button
+      type="button"
+      disabled={disabled}
+      aria-labelledby={labelId}
+      onClick={() => inputRef.current?.click()}
       onDragOver={(event) => {
         event.preventDefault();
         if (!disabled) setOver(true);
@@ -44,7 +49,7 @@ export function Dropzone({
         if (!disabled) handle(event.dataTransfer.files);
       }}
       className={cx(
-        "relative rounded-lg border border-dashed transition-colors",
+        "relative block w-full rounded-lg border border-dashed text-left transition-colors",
         compact ? "px-4 py-5" : "px-6 py-9",
         disabled
           ? "border-line bg-surface-2 opacity-60"
@@ -63,10 +68,11 @@ export function Dropzone({
           handle(event.target.files);
           event.target.value = "";
         }}
-        className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
-        aria-label={title}
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
       />
-      <div className="pointer-events-none flex flex-col items-center text-center">
+      <div className="flex flex-col items-center text-center">
         <span
           className={cx(
             "mb-2.5 inline-flex items-center justify-center rounded-lg border border-line bg-surface text-ink-3",
@@ -75,9 +81,9 @@ export function Dropzone({
         >
           {icon ?? <IconUpload size={compact ? 14 : 16} />}
         </span>
-        <p className="text-[13.5px] font-medium text-ink">{title}</p>
+        <p id={labelId} className="text-[13.5px] font-medium text-ink">{title}</p>
         {hint ? <p className="mt-1 max-w-[46ch] text-[12.5px] leading-snug text-ink-3">{hint}</p> : null}
       </div>
-    </div>
+    </button>
   );
 }

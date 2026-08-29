@@ -12,11 +12,12 @@ import {
 } from "@/components/ui/icons";
 import { Dropzone } from "./dropzone";
 import { parseRoster, type ParsedStudent } from "@/lib/parse";
+import { extractStudents } from "@/lib/api";
 import { addStudents } from "@/lib/workspace";
 import { pluralize } from "@/lib/format";
 import type { Classroom } from "@/lib/types";
 
-type Mode = "paste" | "file";
+type Mode = "paste" | "file" | "ai";
 
 const PLACEHOLDER = `Rahul Sharma
 Priya Patel
@@ -82,6 +83,25 @@ export function AddStudentsSheet({
       setNote(`Read ${pluralize(students.length, "student")} from ${file.name}.`);
     } catch {
       toast("Could not read that file", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function readRegister(files: File[]) {
+    const file = files[0];
+    if (!file || !classroom) return;
+    setBusy(true);
+    try {
+      const { students } = await extractStudents(classroom.id, file);
+      if (students.length === 0) {
+        toast("No students found on that page — try a clearer photo", "error");
+        return;
+      }
+      setReview(students.map((student) => ({ name: student.name, rollNo: student.roll_no ?? undefined })));
+      setNote(`Read ${pluralize(students.length, "student")} off ${file.name}.`);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not read that register", "error");
     } finally {
       setBusy(false);
     }
@@ -165,7 +185,8 @@ export function AddStudentsSheet({
             className="mb-4"
             options={[
               { value: "paste", label: "Type or paste", icon: <IconUsers size={13} /> },
-              { value: "file", label: "Upload a file", icon: <IconFile size={13} /> },
+              { value: "file", label: "CSV file", icon: <IconFile size={13} /> },
+              { value: "ai", label: "Read a register", icon: <IconSparkle size={13} /> },
             ]}
           />
 
@@ -196,6 +217,22 @@ export function AddStudentsSheet({
               hint="CSV or TSV exported from your school system. Headers are detected automatically."
               icon={busy ? <Spinner size={16} /> : <IconFile size={16} />}
             />
+          ) : null}
+
+          {mode === "ai" ? (
+            <div>
+              <Dropzone
+                accept="image/*,.pdf"
+                onFiles={readRegister}
+                disabled={busy}
+                title={busy ? "Reading the register…" : "Photograph your class register"}
+                hint="A photo, scan, or PDF of the attendance register. Names and roll numbers are read off the page."
+                icon={busy ? <Spinner size={16} /> : <IconSparkle size={16} />}
+              />
+              <p className="mt-2 text-[12.5px] text-ink-3">
+                You review every name before anything is added.
+              </p>
+            </div>
           ) : null}
 
         </div>

@@ -14,16 +14,8 @@ import {
 } from "@/components/ui/icons";
 import { fetchSheet } from "@/lib/api";
 import { reviewSubmission } from "@/lib/workspace";
-import { formatMark, formatPercent, markTone } from "@/lib/format";
+import { formatMark, formatPercent, markTone, MARK_TONE_CLASS } from "@/lib/format";
 import type { Student, Submission, Test } from "@/lib/types";
-
-const TONE_TEXT = {
-  strong: "text-accent",
-  fine: "text-ink",
-  watch: "text-warn",
-  low: "text-danger",
-  none: "text-ink-4",
-} as const;
 
 /**
  * The answer sheet itself.
@@ -255,7 +247,7 @@ export function ResultSheet({
                     <span
                       className={cx(
                         "font-mono text-[30px] font-medium tracking-[-0.03em] tnum",
-                        TONE_TEXT[markTone(percent)],
+                        MARK_TONE_CLASS[markTone(percent)],
                       )}
                     >
                       {formatMark(submission.score ?? 0)}
@@ -335,7 +327,7 @@ export function ResultSheet({
                         <span
                           className={cx(
                             "shrink-0 pt-0.5 font-mono text-[13px] font-medium tnum",
-                            TONE_TEXT[markTone(ratio)],
+                            MARK_TONE_CLASS[markTone(ratio)],
                           )}
                         >
                           {formatMark(question.awarded)}
