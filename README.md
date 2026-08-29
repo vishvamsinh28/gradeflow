@@ -1,180 +1,196 @@
 # GradeFlow
 
-GradeFlow is an AI grading workspace for handwritten or typed worksheet submissions. Teachers create classes, build structured answer keys and rubrics, batch-upload student work, run a LangGraph grading workflow with Gemini, review uncertain results, revise rubrics, regrade submissions, return results through student links, and keep an audit trail of grading decisions. LangSmith tracing is required for workflow observability.
+AI grading and classroom management for teachers.
 
-## Stack
-
-- Next.js + TypeScript frontend
-- FastAPI backend
-- Supabase Postgres and private Storage
-- Custom bcrypt password hashing and JWT HTTP-only cookies
-- Gemini multimodal extraction and grading
-- LangGraph workflow orchestration
-- LangSmith tracing/observability
-
-## Product workflows
-
-1. Register and sign in as a teacher.
-2. Create classes and add students.
-3. Configure teacher settings for Gemini model, confidence threshold, and default grading rules.
-4. Create assignments with a structured question builder, answer key, and rubric.
-5. Batch-upload worksheet images or PDFs and assign submissions by student name.
-6. Run grading, inspect extraction evidence, question-level scores, feedback, confidence, and review status.
-7. Resolve low-confidence work from the cross-class review queue.
-8. Edit rubrics, save assignment versions, and regrade all existing submissions when criteria change.
-9. Approve or override final scores and return completed results to student portal links.
-10. Review audit logs for settings changes, grading runs, approvals, overrides, returns, deletes, and regrades.
-
-## Project structure
+Create a classroom, add students, create a test, upload the answer sheets, and GradeFlow
+marks every one of them. Marks and attendance collect in one table you can sort, filter
+and export.
 
 ```text
-gradeflow/
-  backend/       FastAPI API, Gemini service, LangGraph workflow
-    supabase/    SQL schema and private Storage bucket setup
-  frontend/      Next.js App Router dashboard
-  setup.sh       macOS/Linux dependency and environment setup
-  start.sh       macOS/Linux frontend + backend development launcher
+Create classroom → Add students → Create test → Upload answers → AI grades → Review marks
 ```
 
-## Quick start
+## The product
 
-Requirements:
-
-- Python 3.11 or newer
-- Node.js 20 or newer
-- npm
-- A Supabase project and Gemini API key
-
-```bash
-chmod +x setup.sh start.sh
-./setup.sh
-```
-
-Fill in `backend/.env`, apply the Supabase schema, and then start both services:
-
-```bash
-make db-setup
-./start.sh
-```
-
-The frontend runs at `http://localhost:3000` and FastAPI runs at `http://localhost:8000`. Press `Ctrl+C` in the launcher terminal to stop both.
-
-The setup script is safe to run again: it keeps existing `.env` files, creates missing local environment files, generates a secure JWT secret on first setup, and skips the frontend install when `node_modules` is already healthy.
-
-## 1. Configure Supabase
-
-Create a Supabase project, then apply the schema from your terminal:
-
-```bash
-make db-setup
-```
-
-The script reads `DB_URL` from `backend/.env` and runs `backend/supabase/schema.sql` through `psql`.
-
-The backend uses `SUPABASE_SECRET_KEY` for server-side Supabase API access and `DB_URL` only for direct database setup. Use a server-only Supabase service role or secret key here; never expose this key in frontend environment variables or browser code.
-
-## 2. Environment configuration
-
-`./setup.sh` creates these local files when they do not already exist:
-
-- `backend/.env` from `backend/.env.example`
-- `frontend/.env.local` from `frontend/.env.example`
-
-Edit `backend/.env` with your Supabase, Gemini, JWT, and LangSmith values. The frontend example already points to the local FastAPI server. If you already have `frontend/.env`, the setup and start scripts keep using it instead of creating a duplicate frontend env file.
-
-For Supabase, copy the project URL and a server-only service role/secret key into `backend/.env`:
-
-```env
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SECRET_KEY=your-server-only-service-role-or-secret-key
-```
-
-Registration and dashboard writes go through FastAPI, which enforces ownership checks before querying Supabase. The secret key is needed because this project uses custom JWT cookies rather than Supabase Auth, so Supabase row-level security cannot identify the current app user from the publishable key.
-
-## 3. Start development servers
-
-Use the root launcher to run the backend and frontend together:
-
-```bash
-./start.sh
-```
-
-You can still run the services independently with `make backend` and `make frontend` on macOS/Linux.
-
-## Troubleshooting
-
-If registration or login returns `Supabase schema is not ready`, run:
-
-```bash
-make db-setup
-```
-
-That error means the backend can reach Supabase, but PostgREST cannot find the app tables such as `public.users`. After running the SQL, wait a few seconds for Supabase's schema cache to refresh and retry.
-
-## LangSmith
-
-LangSmith tracing is required. Set these variables in the backend environment:
-
-```env
-LANGSMITH_TRACING=true
-LANGSMITH_API_KEY=...
-LANGSMITH_PROJECT=gradeflow-dev
-```
-
-The backend validates these on startup and rejects `LANGSMITH_TRACING=false`. LangGraph executions appear as traces. The graph deliberately keeps raw worksheet bytes out of graph state so uploaded student work is not copied into node state traces.
-
-## Grading graph
+The classroom is the central entity. Everything else hangs off it.
 
 ```text
-load_context
-   ↓
-extract_work (Gemini vision/document understanding)
-   ↓
-grade_work (Gemini structured JSON)
-   ↓
-calculate_confidence
-   ├── confidence below threshold → mark_for_review
-   └── confidence acceptable      → generate_summary
-   ↓
-persist_result
+Class 10-A
+├── Subjects      Mathematics · Physics · Chemistry · English
+├── Students      32, each with a generated ID (STU-001…)
+├── Tests         a date, and optionally a subject, title and grading note
+├── Submissions   one answer sheet per student per test
+└── Attendance    present/absent per student per test
 ```
 
-## Assignment builder
+### Design decisions worth knowing
 
-Teachers build assignments from the UI instead of typing JSON. Each question captures:
+- **A test needs a date and nothing else.** Subject, title, total marks and grading
+  instructions are all optional. There is no rubric builder, no answer key editor, no
+  model picker, no confidence threshold — the grading notes are one free-text field
+  ("give method marks when the arithmetic slips", "be strict about units").
+- **Tests have three states**: `collecting` → `grading` → `graded`. No draft/publish step.
+- **Attendance is tied to a test**, not to a day. An absent student is never asked for an
+  answer sheet and never drags down an average.
+- **Subjects are just names.** They live inline on the classroom overview rather than
+  getting a page of their own.
+- **Grading starts by itself** once answers are uploaded. Progress is shown per student,
+  and it keeps running if the teacher navigates away.
 
-- question number and prompt
-- expected answer
-- max score
-- scoring criteria
-- common mistakes
+## Screens
 
-GradeFlow stores that structured answer key/rubric as JSONB internally, snapshots versions on edit, and can regrade existing submissions against the latest version.
+| Route | What it is |
+| --- | --- |
+| `/` | Landing page |
+| `/signin`, `/signup` | Accounts |
+| `/app` | Dashboard — classroom cards, plus the work that actually needs you |
+| `/app/[classroom]` | Overview — stats, tests, subjects, students |
+| `/app/[classroom]/students` | Roster with search, sorting and a per-student record |
+| `/app/[classroom]/tests` | All tests, filtered by status and subject |
+| `/app/[classroom]/tests/[testId]` | The core screen: attendance, uploads, grading, results |
+| `/app/[classroom]/marks` | The marks table — sort, filter, search, export |
 
-## Student result links
+`⌘K` opens a command palette that searches classrooms, tests and students. `c` creates a
+classroom, `t` creates a test, `/` opens search.
 
-Each student has a private portal token. Teachers can copy a returned-results link from the class roster. The public results page only shows assignments marked `returned`; drafts, active grading work, archived assignments, and pending review items are hidden.
+## Accounts
 
-## Audit and version history
+Every workspace belongs to a signed-in teacher. [`frontend/lib/auth.ts`](frontend/lib/auth.ts)
+has two backends behind one interface:
 
-GradeFlow writes audit events for important teacher and system actions:
+| Mode | When | What happens |
+| --- | --- | --- |
+| `api` | `NEXT_PUBLIC_API_URL` is set | Real accounts against the FastAPI service — bcrypt hashing, JWT in an http-only cookie, Bearer fallback for preview deployments |
+| `local` | no API configured | Accounts live in this browser so the product runs with no server. Passwords are PBKDF2-hashed rather than stored, but this is **not** a security boundary — it exists so the app can be run and demonstrated |
 
-- settings updates
-- assignment edits, status changes, duplicates, returns, regrades, and deletes
-- submission uploads, grading runs, approvals, teacher reviews, and deletes
+`/app` and everything under it redirect to `/signin` without a session. A new account starts
+with an empty workspace and is offered either "create your first classroom" or "explore with
+sample data"; the sample workspace is never loaded behind your back.
 
-Assignment edits also create `assignment_versions` rows so rubric changes are traceable before regrading.
+Workspace data is stored per account under `gradeflow.workspace.v2:<userId>`, so two accounts
+in the same browser never see each other's classrooms.
 
-## Production notes
+## Design system
 
-- Deploy the backend with Python 3.11 or newer. This repo includes `runtime.txt` pinned to the currently verified Python runtime; deployment commands should use the backend virtual environment or install from `backend/pyproject.toml`, not the host system Python.
-- Build the frontend with `NEXT_PUBLIC_API_URL` set to the deployed API base URL, for example `https://api.example.com/api/v1`. Do not ship the default localhost value from `frontend/.env.example`.
-- If the frontend and API are on different domains, set `FRONTEND_ORIGIN` to the exact production frontend origin. If you need more than one allowed frontend, set `FRONTEND_ORIGINS` to a comma-separated list such as `https://app.example.com,https://www.example.com`. Use origins only: no trailing paths. Also set `COOKIE_SECURE=true` and `COOKIE_SAMESITE=none` so browser `credentials: "include"` requests can carry the HTTP-only session cookie over HTTPS.
-- If the frontend and API are under the same site, such as `app.example.com` and `api.example.com`, `COOKIE_SAMESITE=lax` can be used with `COOKIE_SECURE=true`.
-- The frontend also stores the returned JWT in `sessionStorage` as a fallback for preview deployments where cross-site cookies are not persisted. The HTTP-only cookie should still be treated as the preferred production session path.
-- Keep the state-changing endpoint Origin checks enabled. Add per-request CSRF tokens if you need stronger browser-side request forgery protection.
-- Current grading and regrading requests enqueue FastAPI background tasks to avoid request timeouts. Replace those background tasks with a durable worker/queue before running large production batches or multiple API replicas.
+Defined once in [`frontend/app/globals.css`](frontend/app/globals.css) and consumed as
+Tailwind v4 utilities.
+
+**One theme: a cool navy night.** The neutrals are derived from the same family as the
+star-field sections, so a night band and the page around it are the same material rather
+than two darks that happen to sit beside each other. `--night-edge` resolves to the page
+background, which is why those bands fade out instead of butting against an edge.
+
+- Navy-black page, lifted navy surfaces, hairline borders
+- A single evergreen accent that also carries "graded" and "correct"
+- Amber for "needs review", coral for "absent"
+- Instrument Serif for display type, Instrument Sans for UI, IBM Plex Mono with tabular
+  figures for every number
+- Restrained radii (5–14px), soft shadows, no gradients outside the night sections
+
+Nothing in the app names a hex value. Solid fills carry their own foreground token
+(`--accent-on`, `--danger-on`), and shared class constants never set a colour a caller might
+need to override — both are how white-on-white buttons and silently-ignored mark colours got
+in the first time.
+
+Base styles live inside `@layer base` so utility classes still win on elements like
+`<button>`. `@source` globs are listed explicitly because they resolve relative to the CSS
+file, not the project root.
+
+## Frontend architecture
+
+```text
+frontend/
+  app/
+    page.tsx                      Landing page
+    app/                          The workspace (client-rendered)
+      layout.tsx                  App shell: top bar, command palette, create flows
+      [classroom]/…               Classroom surfaces
+  components/
+    ui/                           Design-system primitives (buttons, fields, overlays…)
+    app/                          Workspace components
+    landing/                      Product replicas used on the landing page
+  lib/
+    types.ts                      Domain model
+    store.ts                      Workspace store + derived data
+    ai.ts                         The AI seam (matching, extraction, grading)
+    seed.ts                       Deterministic sample data
+    parse.ts                      Roster parsing (paste / CSV / TSV)
+```
+
+The store is a small vanilla store read through `useSyncExternalStore` and persisted to
+`localStorage`. Long-running work (grading a batch) lives in the store rather than in a
+component, so a teacher can start grading and navigate away while it finishes.
+
+Landing-page mockups are built from the same design tokens as the real product rather than
+being screenshots, so they stay honest and stay crisp at any size.
+
+### Sample workspace
+
+This build ships as a **self-contained sample workspace**: three classrooms, 78 students
+and eight tests of realistic seeded data, generated deterministically so the server and the
+client render the same thing. Everything is editable, and *Reset sample data* in the
+account menu restores it.
+
+The three AI operations all go through [`frontend/lib/ai.ts`](frontend/lib/ai.ts):
+
+| Call | What it does | In the sample workspace |
+| --- | --- | --- |
+| `matchFilesToStudents` | Assigns uploaded sheets to students | Real heuristics on filename (ID, roll number, name); anything left over falls back to roster order |
+| `extractRoster` | Reads a student list out of a file | Real parsing for CSV/TSV/TXT; a stand-in extraction for images and PDFs |
+| `gradeSubmission` | Marks one answer sheet | Deterministic simulated marking with per-question feedback |
+
+That file is the only place to change when pointing the app at a live backend.
+
+## Running it
+
+```bash
+npm --prefix frontend install
+npm --prefix frontend run dev
+```
+
+The app runs at `http://localhost:3000`. With no `NEXT_PUBLIC_API_URL` set, accounts and the
+workspace are browser-local and nothing else needs to be running.
+
+> Two Next processes must never share one `.next` directory — the second one will start
+> throwing `MODULE_NOT_FOUND` and eventually hang. To build while a dev server is running,
+> give the build its own output directory:
+>
+> ```bash
+> NEXT_DIST_DIR=.next-build npm --prefix frontend run build
+> ```
+
+## Backend
+
+`backend/` holds the original FastAPI service: Supabase Postgres and private Storage,
+custom JWT auth, Gemini multimodal extraction and grading, and a LangGraph workflow with
+LangSmith tracing. See [`backend/supabase/schema.sql`](backend/supabase/schema.sql) and
+`backend/app/`.
+
+**Auth is already wired up.** `/auth/register`, `/auth/login`, `/auth/logout` and `/auth/me`
+back the sign-in and sign-up screens whenever `NEXT_PUBLIC_API_URL` is set.
+
+**The rest has not been migrated to the redesigned domain model yet.** It still models
+`classes → assignments (answer_key, rubric, total_points) → submissions`, so classrooms,
+tests and marks are still held client-side. Moving them onto the server needs:
+
+- `subjects` (classroom-scoped) and `attendance` (test × student) tables
+- `assignments` → `tests`: a required `date`, optional `subject_id`/`title`, free-text
+  `instructions` replacing `answer_key`/`rubric`, and the three-state status
+- `students`: a stable display `code` (`STU-001`) and `roll_no`
+- Endpoints for bulk student import, bulk answer upload with AI student matching, and
+  attendance
+- A grading prompt driven by the test's free-text instructions rather than a structured
+  rubric
+
+Setup for the existing service is unchanged: `./setup.sh`, fill in `backend/.env`,
+`make db-setup`, then `./start.sh`.
+
+### Production notes for the backend
+
+- Deploy with Python 3.11+; install from `backend/pyproject.toml`.
+- Set `FRONTEND_ORIGIN` (or `FRONTEND_ORIGINS`) to the exact production origins, and use
+  `COOKIE_SECURE=true` with `COOKIE_SAMESITE=none` for cross-site cookies.
+- Grading currently runs in FastAPI background tasks. Move it to a durable worker or queue
+  before large batches or multiple API replicas.
 - Add malware scanning and stricter file validation before processing uploads.
-- Add signed download URLs and retention/deletion policies for student work.
-- Build a LangSmith evaluation dataset from teacher-approved grading examples before allowing automatic grade release.
-- Add role-based access if schools need co-teachers, department leads, or admin review.
+- Add signed download URLs and a retention policy for student work.

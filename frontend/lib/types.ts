@@ -1,92 +1,121 @@
-export type User = {
-  id: string;
-  email: string;
-  full_name: string;
-};
+/**
+ * GradeFlow domain model.
+ *
+ * The classroom is the central entity. Everything else — subjects, students,
+ * tests, submissions, attendance — hangs off it.
+ */
 
-export type Classroom = {
-  id: string;
+export type ID = string;
+
+export type Subject = {
+  id: ID;
   name: string;
-  subject: string;
-  grade_level?: string;
-  students?: Student[];
-  assignments?: Assignment[];
 };
 
 export type Student = {
-  id: string;
+  id: ID;
+  /** Human-facing identifier shown in the UI, e.g. "STU-001". */
+  code: string;
   name: string;
-  external_id?: string;
-  portal_token?: string;
+  rollNo?: string;
 };
 
-export type Assignment = {
-  id: string;
-  class_id: string;
-  title: string;
+export type Classroom = {
+  id: ID;
+  /** URL slug, e.g. "class-10-a". */
+  slug: string;
+  name: string;
   description?: string;
-  total_points: number;
-  answer_key: Record<string, unknown>;
-  rubric: Record<string, unknown>;
-  status: string;
-  students?: Student[];
+  subjects: Subject[];
+  students: Student[];
+  tests: Test[];
+  createdAt: string;
+};
+
+/**
+ * A test moves through exactly three states. There is no draft/publish step —
+ * a test exists the moment it is created and starts collecting answers.
+ */
+export type TestStatus = "collecting" | "grading" | "graded";
+
+export type Test = {
+  id: ID;
+  /** ISO date (YYYY-MM-DD). The only required field when creating a test. */
+  date: string;
+  title?: string;
+  subjectId?: ID;
+  /** Free-text grading guidance for the AI. No rubric builder, no parameters. */
+  instructions?: string;
+  maxMarks: number;
+  status: TestStatus;
+  createdAt: string;
+};
+
+export type SubmissionStatus =
+  | "awaiting"
+  | "queued"
+  | "grading"
+  | "graded"
+  | "failed";
+
+export type QuestionMark = {
+  number: string;
+  awarded: number;
+  outOf: number;
+  note: string;
 };
 
 export type Submission = {
-  id: string;
-  original_filename: string;
-  mime_type?: string;
-  status: string;
+  id: ID;
+  testId: ID;
+  studentId: ID;
+  fileName?: string;
+  /** Set when the file was matched to a student by AI rather than by the teacher. */
+  matchedByAI?: boolean;
+  status: SubmissionStatus;
   score?: number;
-  max_score?: number;
-  confidence?: number;
-  review_required: boolean;
-  feedback?: { summary?: string; teacher_action?: string; teacher_note?: string };
-  extracted_answers?: { questions?: Record<string, unknown>[]; document_notes?: string };
-  students?: { name: string };
-  student?: Student;
-  assignment?: Assignment;
-  question_results?: QuestionResult[];
+  outOf?: number;
+  summary?: string;
+  questions?: QuestionMark[];
+  /** True when the AI could not read the work confidently and wants a human look. */
+  needsReview?: boolean;
+  /** Set when a teacher overrides the AI score. */
+  overridden?: boolean;
+  gradedAt?: string;
+  error?: string;
 };
 
-export type QuestionResult = {
-  id: string;
-  question_number: string;
-  student_work: string;
-  score: number;
-  max_score: number;
-  feedback: string;
-  confidence: number;
-  error_category?: string;
+export type AttendanceMark = "present" | "absent";
+
+/** Keyed `${testId}:${studentId}`. Missing entries default to present. */
+export type AttendanceMap = Record<string, AttendanceMark>;
+
+export type Database = {
+  version: number;
+  teacherName: string;
+  classrooms: Classroom[];
+  submissions: Submission[];
+  attendance: AttendanceMap;
 };
 
-export type TeacherSettings = {
-  user_id: string;
-  gemini_model: string;
-  confidence_threshold: number;
-  default_subject: string;
-  default_grade_level?: string | null;
-  default_grading_rules: string;
+/* ---------- Derived view models ---------- */
+
+export type TestProgress = {
+  expected: number;
+  submitted: number;
+  graded: number;
+  absent: number;
+  needsReview: number;
+  averagePercent: number | null;
 };
 
-export type AuditLog = {
-  id: string;
-  entity_type: string;
-  entity_id?: string;
-  action: string;
-  details: Record<string, unknown>;
-  created_at: string;
-};
-
-export type AssignmentVersion = {
-  id: string;
-  assignment_id: string;
-  version_number: number;
-  title: string;
-  description?: string;
-  total_points: number;
-  answer_key: Record<string, unknown>;
-  rubric: Record<string, unknown>;
-  change_note?: string;
-  created_at: string;
+export type MarksRow = {
+  student: Student;
+  /** subjectId -> average percent across graded tests in that subject. */
+  bySubject: Record<ID, number | null>;
+  /** testId -> percent. */
+  byTest: Record<ID, number | null>;
+  average: number | null;
+  attendancePercent: number | null;
+  needsReview: number;
 };

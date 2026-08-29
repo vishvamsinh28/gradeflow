@@ -1,29 +1,50 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { Instrument_Sans, Instrument_Serif, IBM_Plex_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
-import { ConfirmProvider } from "@/components/ConfirmProvider";
-import { ToastProvider } from "@/components/ToastProvider";
 import "./globals.css";
 
+const sans = Instrument_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-instrument-sans",
+  display: "swap",
+});
+
+const serif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: ["400"],
+  style: ["normal", "italic"],
+  variable: "--font-instrument-serif",
+  display: "swap",
+});
+
+const mono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-plex-mono",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "GradeFlow — AI grading for teachers",
-  description: "Upload student work, grade it against your answer keys and rubrics, review uncertain decisions, and understand class performance.",
+  title: {
+    default: "GradeFlow — AI grading for teachers",
+    template: "%s · GradeFlow",
+  },
+  description:
+    "Upload answer sheets, let AI grade them, and manage your classroom, marks, and attendance from one simple workspace.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0a1017",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="en" className={`${sans.variable} ${serif.variable} ${mono.variable}`}>
       <body>
-        <ToastProvider>
-          <ConfirmProvider>{children}</ConfirmProvider>
-        </ToastProvider>
+        {children}
         <Analytics />
       </body>
     </html>

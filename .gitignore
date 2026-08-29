@@ -49,3 +49,6 @@ Thumbs.db
 *.pid
 .tmp/
 tmp/
+
+# Alternate Next build outputs (NEXT_DIST_DIR)
+.next-*/
