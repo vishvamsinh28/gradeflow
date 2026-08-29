@@ -55,6 +55,10 @@ existing `.env`.
 | `DB_URL` | Supabase → Project Settings → Database → Connection string (URI). Used only to apply the schema |
 | `GEMINI_API_KEY` | <https://aistudio.google.com/apikey> |
 
+`GEMINI_MODEL` sets the one model used for both extraction and grading. It has a working
+default, so you only need to touch it to switch models — there is no per-teacher model
+choice and no model picker in the UI.
+
 **3. Create the database tables.**
 
 ```bash

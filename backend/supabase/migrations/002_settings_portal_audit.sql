@@ -10,7 +10,6 @@ alter table public.students
 
 create table if not exists public.teacher_settings (
   user_id uuid primary key references public.users(id) on delete cascade,
-  gemini_model text not null default 'gemini-3.1-flash-lite',
   confidence_threshold numeric not null default 0.72 check (confidence_threshold >= 0 and confidence_threshold <= 1),
   default_subject text not null default 'Mathematics',
   default_grade_level text,

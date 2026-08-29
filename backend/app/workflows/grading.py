@@ -103,15 +103,13 @@ class GradingWorkflow:
     def extract_work(self, state: GradingState) -> dict[str, Any]:
         submission = state["submission"]
         file_bytes = self.storage.download(submission["storage_path"])
-        model = (state.get("teacher_settings") or {}).get("gemini_model")
-        extracted = GeminiGrader(model=model).extract_work(file_bytes, submission["mime_type"])
+        extracted = GeminiGrader().extract_work(file_bytes, submission["mime_type"])
         return {"extracted": extracted.model_dump()}
 
     def grade_work(self, state: GradingState) -> dict[str, Any]:
         assignment = state["assignment"]
         extracted = ExtractionResult.model_validate(state["extracted"])
-        model = (state.get("teacher_settings") or {}).get("gemini_model")
-        grading = GeminiGrader(model=model).grade_work(
+        grading = GeminiGrader().grade_work(
             extracted=extracted,
             answer_key=assignment["answer_key"],
             rubric=assignment["rubric"],

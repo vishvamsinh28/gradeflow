@@ -5,14 +5,12 @@ from supabase import Client
 
 from app.db.supabase import get_supabase
 from app.dependencies import get_current_user
-from app.core.gemini_models import DEFAULT_GEMINI_MODEL, resolve_gemini_model
 from app.models.schemas import TeacherSettingsUpdate
 from app.services.audit import log_audit
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
 DEFAULT_SETTINGS = {
-    "gemini_model": DEFAULT_GEMINI_MODEL,
     "confidence_threshold": 0.72,
     "default_subject": "Mathematics",
     "default_grade_level": None,
@@ -23,12 +21,7 @@ DEFAULT_SETTINGS = {
 def get_or_create_settings(db: Client, user_id: str) -> dict:
     response = db.table("teacher_settings").select("*").eq("user_id", user_id).limit(1).execute()
     if response.data:
-        row = response.data[0]
-        resolved_model = resolve_gemini_model(row.get("gemini_model"))
-        if resolved_model != row.get("gemini_model"):
-            updated = db.table("teacher_settings").update({"gemini_model": resolved_model}).eq("user_id", user_id).execute()
-            return updated.data[0]
-        return row
+        return response.data[0]
     created = db.table("teacher_settings").insert({"user_id": user_id, **DEFAULT_SETTINGS}).execute()
     return created.data[0]
 
