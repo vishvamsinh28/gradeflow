@@ -11,14 +11,12 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { gradeSubmission } from "./ai";
 import { slugify, todayISO } from "./format";
-import { createSeedDatabase } from "./seed";
 import type { ParsedStudent } from "./parse";
 import type {
   AttendanceMark,
   Classroom,
   Database,
   ID,
-  MarksRow,
   Student,
   Submission,
   Test,
@@ -520,18 +518,13 @@ export async function startGrading(classroomId: ID, testId: ID): Promise<void> {
 
 /* ---------- Workspace lifecycle ---------- */
 
-/** Fills an account with the demo classrooms so the product can be explored. */
-export function loadSampleData() {
-  commit({ ...createSeedDatabase(), version: state.version, teacherName: state.teacherName });
-}
-
 export function clearWorkspace() {
   commit(emptyDatabase(state.teacherName));
 }
 
 /* ---------- Derived data ---------- */
 
-export function submissionsForTest(db: Database, testId: ID): Submission[] {
+function submissionsForTest(db: Database, testId: ID): Submission[] {
   return db.submissions.filter((submission) => submission.testId === testId);
 }
 
@@ -585,64 +578,4 @@ export function classroomSummary(db: Database, classroom: Classroom) {
     average:
       averages.length > 0 ? averages.reduce((sum, value) => sum + value, 0) / averages.length : null,
   };
-}
-
-export function buildMarksRows(
-  db: Database,
-  classroom: Classroom,
-  scope: { subjectId?: ID; testId?: ID },
-): MarksRow[] {
-  const tests = classroom.tests.filter((test) => {
-    if (scope.testId) return test.id === scope.testId;
-    if (scope.subjectId) return test.subjectId === scope.subjectId;
-    return true;
-  });
-  const testIds = new Set(tests.map((test) => test.id));
-  const relevant = db.submissions.filter(
-    (submission) => testIds.has(submission.testId) && submission.status === "graded",
-  );
-
-  return classroom.students.map((student) => {
-    const byTest: Record<ID, number | null> = {};
-    const bySubjectValues: Record<ID, number[]> = {};
-    const all: number[] = [];
-    let needsReview = 0;
-
-    tests.forEach((test) => {
-      const submission = relevant.find(
-        (item) => item.testId === test.id && item.studentId === student.id,
-      );
-      if (!submission || !submission.outOf) {
-        byTest[test.id] = null;
-        return;
-      }
-      const percent = ((submission.score ?? 0) / submission.outOf) * 100;
-      byTest[test.id] = percent;
-      all.push(percent);
-      if (submission.needsReview) needsReview += 1;
-      if (test.subjectId) {
-        bySubjectValues[test.subjectId] = [...(bySubjectValues[test.subjectId] ?? []), percent];
-      }
-    });
-
-    const bySubject: Record<ID, number | null> = {};
-    classroom.subjects.forEach((subject) => {
-      const values = bySubjectValues[subject.id] ?? [];
-      bySubject[subject.id] =
-        values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
-    });
-
-    const attended = tests.filter(
-      (test) => attendanceOf(db, test.id, student.id) === "present",
-    ).length;
-
-    return {
-      student,
-      byTest,
-      bySubject,
-      average: all.length > 0 ? all.reduce((sum, value) => sum + value, 0) / all.length : null,
-      attendancePercent: tests.length > 0 ? (attended / tests.length) * 100 : null,
-      needsReview,
-    };
-  });
 }

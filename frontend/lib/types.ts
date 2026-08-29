@@ -109,13 +109,3 @@ export type TestProgress = {
   averagePercent: number | null;
 };
 
-export type MarksRow = {
-  student: Student;
-  /** subjectId -> average percent across graded tests in that subject. */
-  bySubject: Record<ID, number | null>;
-  /** testId -> percent. */
-  byTest: Record<ID, number | null>;
-  average: number | null;
-  attendancePercent: number | null;
-  needsReview: number;
-};

@@ -39,12 +39,6 @@ export function formatPercent(value: number | null | undefined, digits = 0): str
   return `${value.toFixed(digits)}%`;
 }
 
-export function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
 /** A calm four-band scale — no letter-grade fetishism, just a readable signal. */
 export function markTone(percent: number | null | undefined): "strong" | "fine" | "watch" | "low" | "none" {
   if (percent === null || percent === undefined) return "none";

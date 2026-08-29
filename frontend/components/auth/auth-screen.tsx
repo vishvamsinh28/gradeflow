@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { Button, Field, Input } from "@/components/ui/primitives";
-import { IconAlert, Logo } from "@/components/ui/icons";
+import { Button, Field, Input, cx } from "@/components/ui/primitives";
+import { IconAlert, IconEye, IconEyeOff, Logo } from "@/components/ui/icons";
 import { NightPanel } from "./night-panel";
 import { useAuth } from "@/components/app/auth-provider";
 import {
@@ -30,6 +30,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [revealed, setRevealed] = useState(false);
 
   const isSignUp = mode === "signup";
   const next = searchParams.get("next") ?? "/app";
@@ -127,15 +128,27 @@ export function AuthScreen({ mode }: { mode: Mode }) {
                   label="Password"
                   hint={errors.password ?? (isSignUp ? "At least 8 characters." : undefined)}
                 >
-                  <Input
-                    type="password"
-                    autoComplete={isSignUp ? "new-password" : "current-password"}
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    placeholder="••••••••"
-                    aria-invalid={Boolean(errors.password)}
-                    className={errors.password ? "border-danger" : undefined}
-                  />
+                  <div className="relative">
+                    <Input
+                      type={revealed ? "text" : "password"}
+                      autoComplete={isSignUp ? "new-password" : "current-password"}
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      placeholder={revealed ? "your password" : "••••••••"}
+                      aria-invalid={Boolean(errors.password)}
+                      className={cx("pr-10", errors.password && "border-danger")}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setRevealed((value) => !value)}
+                      aria-label={revealed ? "Hide password" : "Show password"}
+                      aria-pressed={revealed}
+                      title={revealed ? "Hide password" : "Show password"}
+                      className="absolute right-1 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink"
+                    >
+                      {revealed ? <IconEyeOff size={15} /> : <IconEye size={15} />}
+                    </button>
+                  </div>
                 </Field>
 
                 {formError ? (

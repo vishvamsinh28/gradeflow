@@ -12,15 +12,13 @@ import {
   IconUsers,
 } from "@/components/ui/icons";
 import { NewClassroomButton, PageHeader, useWorkspaceActions } from "@/components/app/shell";
-import { classroomSummary, loadSampleData, testProgress, useDatabase } from "@/lib/store";
-import { useToast } from "@/components/ui/overlays";
+import { classroomSummary, testProgress, useDatabase } from "@/lib/store";
 import { formatPercent, greeting, pluralize, relativeDay } from "@/lib/format";
 import type { Classroom } from "@/lib/types";
 
 export default function DashboardPage() {
   const db = useDatabase();
   const { newClassroom } = useWorkspaceActions();
-  const toast = useToast();
 
   const totalStudents = db.classrooms.reduce(
     (sum, classroom) => sum + classroom.students.length,
@@ -148,20 +146,9 @@ export default function DashboardPage() {
               title="No classrooms yet"
               description="A classroom holds your students, subjects, tests, marks and attendance. It takes about ten seconds to set up."
               action={
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  <Button variant="primary" icon={<IconPlus size={15} />} onClick={newClassroom}>
-                    Create your first classroom
-                  </Button>
-                  <Button
-                    icon={<IconSparkle size={15} />}
-                    onClick={() => {
-                      loadSampleData();
-                      toast("Sample workspace loaded", "success");
-                    }}
-                  >
-                    Explore with sample data
-                  </Button>
-                </div>
+                <Button variant="primary" icon={<IconPlus size={15} />} onClick={newClassroom}>
+                  Create your first classroom
+                </Button>
               }
             />
           </div>

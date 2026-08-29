@@ -17,14 +17,13 @@ import {
   IconLogout,
   IconPlus,
   IconSearch,
-  IconSparkle,
   IconTrash,
   Logo,
 } from "@/components/ui/icons";
 import { CommandPalette } from "./command-palette";
 import { AddStudentsSheet } from "./add-students-sheet";
 import { CreateClassroomDialog, CreateTestDialog } from "./create-dialogs";
-import { clearWorkspace, loadSampleData, useDatabase, useHydratedWorkspace } from "@/lib/store";
+import { clearWorkspace, useDatabase, useHydratedWorkspace } from "@/lib/store";
 import { AuthProvider, useAuth } from "./auth-provider";
 import type { Classroom } from "@/lib/types";
 
@@ -175,17 +174,6 @@ function TopBar({ classroom, onSearch }: { classroom?: Classroom; onSearch: () =
     toast("Workspace cleared", "success");
   }
 
-  async function loadSample() {
-    const ok = await confirm({
-      title: "Load sample data?",
-      body: "Three example classrooms with students, tests and marks replace what is in your workspace right now.",
-      confirmLabel: "Load sample data",
-    });
-    if (!ok) return;
-    loadSampleData();
-    router.push("/app");
-    toast("Sample workspace loaded", "success");
-  }
 
   return (
     <header className="sticky top-0 z-[100] border-b border-line bg-paper/85 backdrop-blur-md">
@@ -291,24 +279,6 @@ function TopBar({ classroom, onSearch }: { classroom?: Classroom; onSearch: () =
                 </p>
                 <p className="truncate text-[11.5px] text-ink-3">{user?.email}</p>
               </div>
-              <MenuSeparator />
-              <MenuItem
-                icon={<IconSparkle size={14} />}
-                onClick={() => {
-                  close();
-                  void loadSample();
-                }}
-              >
-                Load sample data
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  close();
-                  router.push("/");
-                }}
-              >
-                Landing page
-              </MenuItem>
               <MenuSeparator />
               <MenuItem
                 icon={<IconTrash size={14} />}

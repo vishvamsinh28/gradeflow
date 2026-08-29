@@ -8,15 +8,7 @@
 
 import type { ReactNode } from "react";
 import { cx } from "@/components/ui/primitives";
-import {
-  IconCheck,
-  IconFile,
-  IconSearch,
-  IconSparkle,
-  IconUpload,
-  Logo,
-  Spinner,
-} from "@/components/ui/icons";
+import { IconFile, IconSearch, IconSparkle, Logo } from "@/components/ui/icons";
 
 /* ---------- Frame ---------- */
 
@@ -158,64 +150,6 @@ export function MarksMock() {
           </tr>
         </tbody>
       </table>
-    </div>
-  );
-}
-
-/* ---------- Grading in progress ---------- */
-
-const GRADING = [
-  { name: "Aarav Shah", id: "STU-001", state: "done", score: "34/40" },
-  { name: "Ananya Iyer", id: "STU-002", state: "done", score: "37/40" },
-  { name: "Kabir Mehta", id: "STU-003", state: "done", score: "29/40" },
-  { name: "Priya Patel", id: "STU-004", state: "grading", score: "" },
-  { name: "Rahul Sharma", id: "STU-005", state: "queued", score: "" },
-  { name: "Riya Shah", id: "STU-006", state: "absent", score: "" },
-] as const;
-
-export function GradingMock() {
-  return (
-    <div>
-      <div className="border-b border-line px-3 py-2.5">
-        <div className="flex items-center justify-between">
-          <p className="flex items-center gap-1.5 text-[11.5px] font-medium text-accent">
-            <Spinner size={11} />
-            Grading 24 submissions…
-          </p>
-          <span className="font-mono text-[11px] text-accent tnum">17/24</span>
-        </div>
-        <div className="mt-2 h-[4px] w-full overflow-hidden rounded-full bg-surface-3">
-          <div className="h-full w-[71%] rounded-full bg-accent" />
-        </div>
-      </div>
-      <ul className="divide-y divide-line">
-        {GRADING.map((row) => (
-          <li key={row.id} className="flex items-center gap-2.5 px-3 py-[7px]">
-            <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full bg-surface-3 text-[8.5px] font-semibold text-ink-2">
-              {row.name.split(" ").map((part) => part[0]).join("")}
-            </span>
-            <span className="flex-1 truncate text-[11.5px] font-medium text-ink">{row.name}</span>
-            <span className="font-mono text-[10px] text-ink-4">{row.id}</span>
-            {row.state === "done" ? (
-              <span className="flex items-center gap-1 font-mono text-[11px] font-medium text-accent tnum">
-                <IconCheck size={11} />
-                {row.score}
-              </span>
-            ) : row.state === "grading" ? (
-              <span className="flex items-center gap-1 text-[10.5px] font-medium text-accent">
-                <Spinner size={10} />
-                Grading
-              </span>
-            ) : row.state === "absent" ? (
-              <span className="rounded border border-danger-line bg-danger-soft px-1 py-[1px] text-[10px] font-medium text-danger">
-                Absent
-              </span>
-            ) : (
-              <span className="text-[10.5px] text-ink-4">Queued</span>
-            )}
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }
@@ -364,64 +298,3 @@ export function UploadMock() {
   );
 }
 
-/* ---------- Small vignettes for "How it works" ---------- */
-
-export function StepClassroom() {
-  return (
-    <div className="rounded-lg border border-line bg-surface p-2.5">
-      <div className="rounded-md border border-line px-2.5 py-1.5">
-        <p className="text-[9px] font-medium uppercase tracking-[0.06em] text-ink-3">
-          Classroom name
-        </p>
-        <p className="mt-0.5 text-[12px] font-medium text-ink">Class 10-A</p>
-      </div>
-      <div className="mt-1.5 flex flex-wrap gap-1">
-        {["Mathematics", "Physics", "Chemistry", "English"].map((subject) => (
-          <span
-            key={subject}
-            className="rounded border border-line bg-surface-2 px-1.5 py-[1px] text-[10px] font-medium text-ink-2"
-          >
-            {subject}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-export function StepUpload() {
-  return (
-    <div className="rounded-lg border border-dashed border-line-strong bg-surface-2/50 px-2.5 py-4 text-center">
-      <span className="mx-auto mb-1.5 flex h-6 w-6 items-center justify-center rounded-md border border-line bg-surface text-ink-3">
-        <IconUpload size={12} />
-      </span>
-      <p className="text-[11px] font-medium text-ink">Drop every answer sheet at once</p>
-      <p className="mt-0.5 text-[10px] text-ink-3">Photos, scans or PDFs</p>
-    </div>
-  );
-}
-
-export function StepGrade() {
-  return (
-    <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface">
-      {[
-        ["Rahul Sharma", "done"],
-        ["Priya Patel", "done"],
-        ["Aarav Shah", "done"],
-        ["Riya Shah", "grading"],
-      ].map(([name, state]) => (
-        <li key={name} className="flex items-center gap-2 px-2.5 py-[6px]">
-          <span className={state === "done" ? "text-accent" : "text-accent"}>
-            {state === "done" ? <IconCheck size={11} /> : <Spinner size={11} />}
-          </span>
-          <span className="flex-1 truncate text-[11px] text-ink">{name}</span>
-          {state === "done" ? (
-            <span className="font-mono text-[10.5px] text-ink-3 tnum">
-              {name === "Rahul Sharma" ? "36/40" : name === "Priya Patel" ? "31/40" : "28/40"}
-            </span>
-          ) : null}
-        </li>
-      ))}
-    </ul>
-  );
-}

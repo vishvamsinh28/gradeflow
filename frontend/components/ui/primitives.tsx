@@ -196,21 +196,6 @@ export function Badge({
   );
 }
 
-/* ---------- Section label ---------- */
-
-export function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <span
-      className={cx(
-        "text-[11px] font-semibold uppercase tracking-[0.075em] text-ink-3",
-        className,
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
 /* ---------- Keyboard hint ---------- */
 
 export function Kbd({ children }: { children: ReactNode }) {

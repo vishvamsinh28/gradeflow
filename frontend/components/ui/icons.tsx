@@ -27,7 +27,6 @@ export const IconPlus = make(<><path d="M12 5v14" /><path d="M5 12h14" /></>, "I
 export const IconCheck = make(<path d="m4.5 12.5 5 5L19.5 7" />, "IconCheck");
 export const IconX = make(<><path d="M6 6l12 12" /><path d="M18 6L6 18" /></>, "IconX");
 export const IconChevronDown = make(<path d="m6 9 6 6 6-6" />, "IconChevronDown");
-export const IconChevronRight = make(<path d="m9 6 6 6-6 6" />, "IconChevronRight");
 export const IconChevronLeft = make(<path d="m15 6-6 6 6 6" />, "IconChevronLeft");
 export const IconArrowRight = make(<><path d="M4 12h15" /><path d="m13 6 6 6-6 6" /></>, "IconArrowRight");
 export const IconArrowUp = make(<><path d="M12 20V5" /><path d="m6 11 6-6 6 6" /></>, "IconArrowUp");
@@ -69,7 +68,6 @@ export const IconAlert = make(
   <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.8v4.7" /><path d="M12 16.1h.01" /></>,
   "IconAlert",
 );
-export const IconClock = make(<><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 1.8" /></>, "IconClock");
 export const IconFile = make(
   <><path d="M13.5 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9z" /><path d="M13.5 3.5V9H19" /></>,
   "IconFile",
@@ -87,27 +85,23 @@ export const IconHome = make(
   <><path d="m4 10.5 8-6.5 8 6.5" /><path d="M6 9.4V19a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 18 19V9.4" /></>,
   "IconHome",
 );
-export const IconRefresh = make(
-  <><path d="M20 11.5a8 8 0 1 0-.9 5" /><path d="M20 4.5v5h-5" /></>,
-  "IconRefresh",
-);
 export const IconDownload = make(
   <><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" /><path d="M12 4v12" /><path d="m7.5 11.5 4.5 4.5 4.5-4.5" /></>,
   "IconDownload",
 );
 
-export const IconSun = make(
-  <><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4" /></>,
-  "IconSun",
-);
-export const IconMoon = make(
-  <path d="M20.5 14.3A8.6 8.6 0 0 1 9.7 3.5a8.6 8.6 0 1 0 10.8 10.8z" />,
-  "IconMoon",
-);
-
 export const IconLogout = make(
   <><path d="M14.5 4.5H6.5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h8" /><path d="M17.5 8.5 21 12l-3.5 3.5" /><path d="M21 12H10" /></>,
   "IconLogout",
+);
+
+export const IconEye = make(
+  <><path d="M2.5 12S6 5.8 12 5.8 21.5 12 21.5 12 18 18.2 12 18.2 2.5 12 2.5 12z" /><circle cx="12" cy="12" r="2.7" /></>,
+  "IconEye",
+);
+export const IconEyeOff = make(
+  <><path d="M9.6 6.1A8.9 8.9 0 0 1 12 5.8c6 0 9.5 6.2 9.5 6.2a17 17 0 0 1-2.9 3.6" /><path d="M6.2 8A17 17 0 0 0 2.5 12S6 18.2 12 18.2a8.7 8.7 0 0 0 3.4-.66" /><path d="M10.1 10.1a2.7 2.7 0 0 0 3.8 3.8" /><path d="M3.6 3.6 20.4 20.4" /></>,
+  "IconEyeOff",
 );
 
 export function Spinner({ size = 14, className = "" }: { size?: number; className?: string }) {
@@ -162,14 +156,5 @@ export function Logo({ size = 22, className = "" }: { size?: number; className?:
         strokeLinecap="round"
       />
     </svg>
-  );
-}
-
-export function Wordmark({ size = 22, className = "" }: { size?: number; className?: string }) {
-  return (
-    <span className={`inline-flex items-center gap-[7px] ${className}`}>
-      <Logo size={size} />
-      <span className="text-[15px] font-semibold tracking-[-0.028em] text-ink">GradeFlow</span>
-    </span>
   );
 }

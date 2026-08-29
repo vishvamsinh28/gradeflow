@@ -106,8 +106,3 @@ export function parseRoster(raw: string): ParsedStudent[] {
   return students;
 }
 
-export const TEXT_FILE_TYPES = [".csv", ".tsv", ".txt"];
-
-export function isTextRoster(fileName: string): boolean {
-  return TEXT_FILE_TYPES.some((ext) => fileName.toLowerCase().endsWith(ext));
-}

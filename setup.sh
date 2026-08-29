@@ -130,6 +130,6 @@ else
 fi
 
 printf '\n\033[1;32mSetup complete.\033[0m\n'
-printf '1. Add your Supabase, Gemini, JWT, and LangSmith values to backend/.env.\n'
+printf '1. Add your Supabase, Gemini and JWT values to backend/.env.\n'
 printf '2. Run the database schema with: make db-setup\n'
 printf '3. Start the app with: ./start.sh\n\n'

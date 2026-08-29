@@ -12,11 +12,104 @@
  */
 
 import { parseRoster, type ParsedStudent } from "./parse";
-import { simulateGrade, seededRng } from "./seed";
 import type { QuestionMark, Student } from "./types";
 
-export const AI_MODE: "demo" | "live" =
-  process.env.NEXT_PUBLIC_API_URL ? "live" : "demo";
+/* ---------- Deterministic simulation ----------
+   Stands in for the model while this build has no grading server. Seeded so a
+   given submission always comes back with the same marks. */
+
+function hash(seed: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i += 1) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function rng(seed: string): () => number {
+  let a = hash(seed);
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function pick<T>(next: () => number, items: readonly T[]): T {
+  return items[Math.floor(next() * items.length)];
+}
+
+/** A stable per-student ability, so results look coherent across subjects. */
+function ability(studentId: string): number {
+  return 0.5 + rng(`ability:${studentId}`)() * 0.45;
+}
+
+const NOTES_GOOD = [
+  "Correct method and a clean final answer.",
+  "Well structured, units carried through correctly.",
+  "Right approach, working clearly laid out.",
+  "Accurate throughout.",
+];
+
+const NOTES_PARTIAL = [
+  "Correct method, arithmetic slip in the final step.",
+  "Right idea but the units were dropped.",
+  "Partial credit — second condition not checked.",
+  "Set up correctly, simplification incomplete.",
+];
+
+const NOTES_POOR = [
+  "Method not applicable to this question.",
+  "Answer left incomplete.",
+  "Concept confused with the previous chapter.",
+  "No supporting working shown.",
+];
+
+function simulateGrade(testId: string, student: Student, maxMarks: number) {
+  const next = rng(`grade:${testId}:${student.id}`);
+  const base = ability(student.id) + (next() - 0.5) * 0.16;
+  const ratio = Math.max(0.24, Math.min(0.99, base));
+
+  const questionCount = 4 + Math.floor(next() * 2);
+  const per = maxMarks / questionCount;
+  const questions: QuestionMark[] = [];
+  let total = 0;
+
+  for (let i = 0; i < questionCount; i += 1) {
+    const wobble = (next() - 0.5) * 0.34;
+    const qRatio = Math.max(0, Math.min(1, ratio + wobble));
+    const awarded = Math.round(per * qRatio * 2) / 2;
+    total += awarded;
+    const notes = qRatio > 0.85 ? NOTES_GOOD : qRatio > 0.45 ? NOTES_PARTIAL : NOTES_POOR;
+    questions.push({
+      number: `Q${i + 1}`,
+      awarded,
+      outOf: Math.round(per * 2) / 2,
+      note: pick(next, notes),
+    });
+  }
+
+  const percent = total / maxMarks;
+  const summary =
+    percent > 0.85
+      ? "Consistently accurate. Method marks awarded in full."
+      : percent > 0.6
+        ? "Solid understanding; loses marks on the final steps rather than the approach."
+        : percent > 0.4
+          ? "Grasps the setup but the working breaks down midway. Worth a second look together."
+          : "Struggling with the core method for this chapter.";
+
+  return {
+    score: Math.round(total * 2) / 2,
+    questions,
+    summary,
+    needsReview: next() < 0.07,
+  };
+}
+
 
 /* ---------- Matching answer sheets to students ---------- */
 
@@ -122,7 +215,7 @@ export async function extractRoster(file: File): Promise<RosterExtraction> {
     };
   }
 
-  const next = seededRng(`extract:${file.name}:${file.size}`);
+  const next = rng(`extract:${file.name}:${file.size}`);
   const count = 6 + Math.floor(next() * 6);
   const first = ["Aarav", "Riya", "Kabir", "Ananya", "Vivaan", "Diya", "Ishaan", "Meera", "Neel", "Sana", "Yash", "Tara"];
   const last = ["Sharma", "Patel", "Shah", "Iyer", "Nair", "Reddy", "Desai", "Mehta"];

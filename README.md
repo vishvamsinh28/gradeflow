@@ -10,6 +10,104 @@ and export.
 Create classroom → Add students → Create test → Upload answers → AI grades → Review marks
 ```
 
+## Getting started
+
+There are two ways to run this, depending on whether you want the AI grading server.
+
+| | What you get | What you need |
+| --- | --- | --- |
+| **A — app only** | The full interface. Accounts and your workspace live in the browser. Grading is simulated locally. | Node 20+ |
+| **B — full stack** | Real accounts and real Gemini grading, backed by Postgres. | Everything in A, plus Python 3.11–3.13, `psql`, a Supabase project and a Gemini API key |
+
+Start with A. It runs in two commands and needs no accounts anywhere.
+
+### A — app only
+
+```bash
+git clone <your-fork-or-this-repo> gradeflow
+cd gradeflow/frontend
+npm install
+npm run dev
+```
+
+Open <http://localhost:3000>, create an account on `/signup`, and you are in. The account
+and everything you create are stored in that browser — see [Accounts](#accounts) for what
+that does and does not mean.
+
+### B — full stack
+
+**1. Install everything.** From the repo root:
+
+```bash
+./setup.sh
+```
+
+That creates `backend/.venv`, installs both dependency sets, and writes `backend/.env`
+with a freshly generated `JWT_SECRET`. It is safe to re-run; it never overwrites an
+existing `.env`.
+
+**2. Fill in `backend/.env`.** `setup.sh` leaves four values as placeholders:
+
+| Key | Where it comes from |
+| --- | --- |
+| `SUPABASE_URL` | Supabase → Project Settings → Data API |
+| `SUPABASE_SECRET_KEY` | Supabase → Project Settings → API Keys → **service role**. Server-only; never expose it to the browser |
+| `DB_URL` | Supabase → Project Settings → Database → Connection string (URI). Used only to apply the schema |
+| `GEMINI_API_KEY` | <https://aistudio.google.com/apikey> |
+
+**3. Create the database tables.**
+
+```bash
+make db-setup
+```
+
+This runs `backend/supabase/schema.sql` and the migrations through `psql`, so you need the
+PostgreSQL client tools installed (`brew install libpq` on macOS, `apt install
+postgresql-client` on Debian/Ubuntu).
+
+**4. Point the frontend at the API.** Uncomment the last line of `frontend/.env.local`:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+```
+
+**5. Run both services.**
+
+```bash
+./start.sh
+```
+
+Frontend on <http://localhost:3000>, API on <http://localhost:8000>. `Ctrl+C` stops both.
+
+### Everyday commands
+
+| Command | What it does |
+| --- | --- |
+| `./start.sh` | Both services together |
+| `make frontend` | Frontend only |
+| `make backend` | API only |
+| `make test` | Backend tests |
+| `make lint` | Ruff over the backend |
+| `make build` | Production build of the frontend |
+
+### If something goes wrong
+
+- **`Cannot reach the GradeFlow server` on sign-in** — the frontend has
+  `NEXT_PUBLIC_API_URL` set but the API is not running. Start it with `make backend`, or
+  comment the variable out to go back to browser-local accounts.
+- **`Supabase schema is not ready`** — the tables do not exist yet. Run `make db-setup`,
+  wait a few seconds for Supabase's schema cache, and retry.
+- **`MODULE_NOT_FOUND` from Next, or a dev server that hangs** — two Next processes are
+  sharing one `.next` directory. Never run `next build` while `next dev` is running; give
+  the build its own output directory instead:
+
+  ```bash
+  NEXT_DIST_DIR=.next-build npm --prefix frontend run build
+  ```
+
+- **`Python 3.11+ is required`** — `setup.sh` could not find a suitable interpreter.
+  Install Python 3.11, 3.12 or 3.13 and run it again.
+
 ## The product
 
 The classroom is the central entity. Everything else hangs off it.
@@ -64,8 +162,11 @@ has two backends behind one interface:
 | `local` | no API configured | Accounts live in this browser so the product runs with no server. Passwords are PBKDF2-hashed rather than stored, but this is **not** a security boundary — it exists so the app can be run and demonstrated |
 
 `/app` and everything under it redirect to `/signin` without a session. A new account starts
-with an empty workspace and is offered either "create your first classroom" or "explore with
-sample data"; the sample workspace is never loaded behind your back.
+with an empty workspace and one call to action: create your first classroom.
+
+Sessions persist until the teacher signs out. The http-only cookie is the primary session;
+the JWT is mirrored into `localStorage` (not `sessionStorage`) so closing the tab does not
+sign anyone out.
 
 Workspace data is stored per account under `gradeflow.workspace.v2:<userId>`, so two accounts
 in the same browser never see each other's classrooms.
@@ -113,7 +214,7 @@ frontend/
     types.ts                      Domain model
     store.ts                      Workspace store + derived data
     ai.ts                         The AI seam (matching, extraction, grading)
-    seed.ts                       Deterministic sample data
+                                  plus the deterministic stand-in for the model
     parse.ts                      Roster parsing (paste / CSV / TSV)
 ```
 
@@ -124,47 +225,23 @@ component, so a teacher can start grading and navigate away while it finishes.
 Landing-page mockups are built from the same design tokens as the real product rather than
 being screenshots, so they stay honest and stay crisp at any size.
 
-### Sample workspace
-
-This build ships as a **self-contained sample workspace**: three classrooms, 78 students
-and eight tests of realistic seeded data, generated deterministically so the server and the
-client render the same thing. Everything is editable, and *Reset sample data* in the
-account menu restores it.
+### The AI seam
 
 The three AI operations all go through [`frontend/lib/ai.ts`](frontend/lib/ai.ts):
 
-| Call | What it does | In the sample workspace |
+| Call | What it does | Without a grading server |
 | --- | --- | --- |
 | `matchFilesToStudents` | Assigns uploaded sheets to students | Real heuristics on filename (ID, roll number, name); anything left over falls back to roster order |
 | `extractRoster` | Reads a student list out of a file | Real parsing for CSV/TSV/TXT; a stand-in extraction for images and PDFs |
-| `gradeSubmission` | Marks one answer sheet | Deterministic simulated marking with per-question feedback |
+| `gradeSubmission` | Marks one answer sheet | Deterministic simulated marking with per-question feedback, seeded so a submission always returns the same marks |
 
 That file is the only place to change when pointing the app at a live backend.
-
-## Running it
-
-```bash
-npm --prefix frontend install
-npm --prefix frontend run dev
-```
-
-The app runs at `http://localhost:3000`. With no `NEXT_PUBLIC_API_URL` set, accounts and the
-workspace are browser-local and nothing else needs to be running.
-
-> Two Next processes must never share one `.next` directory — the second one will start
-> throwing `MODULE_NOT_FOUND` and eventually hang. To build while a dev server is running,
-> give the build its own output directory:
->
-> ```bash
-> NEXT_DIST_DIR=.next-build npm --prefix frontend run build
-> ```
 
 ## Backend
 
 `backend/` holds the original FastAPI service: Supabase Postgres and private Storage,
-custom JWT auth, Gemini multimodal extraction and grading, and a LangGraph workflow with
-LangSmith tracing. See [`backend/supabase/schema.sql`](backend/supabase/schema.sql) and
-`backend/app/`.
+custom JWT auth, Gemini multimodal extraction and grading, and a LangGraph grading workflow.
+See [`backend/supabase/schema.sql`](backend/supabase/schema.sql) and `backend/app/`.
 
 **Auth is already wired up.** `/auth/register`, `/auth/login`, `/auth/logout` and `/auth/me`
 back the sign-in and sign-up screens whenever `NEXT_PUBLIC_API_URL` is set.
@@ -182,8 +259,7 @@ tests and marks are still held client-side. Moving them onto the server needs:
 - A grading prompt driven by the test's free-text instructions rather than a structured
   rubric
 
-Setup for the existing service is unchanged: `./setup.sh`, fill in `backend/.env`,
-`make db-setup`, then `./start.sh`.
+See [Getting started, option B](#b--full-stack) for how to set it up.
 
 ### Production notes for the backend
 

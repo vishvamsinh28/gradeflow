@@ -31,10 +31,6 @@ class Settings(BaseSettings):
     grading_confidence_threshold: float = Field(default=0.72, ge=0, le=1)
     frontend_origins: str | None = None
 
-    langsmith_tracing: bool
-    langsmith_api_key: str = Field(min_length=1)
-    langsmith_project: str = Field(min_length=1)
-
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -43,9 +39,7 @@ class Settings(BaseSettings):
     )
 
     @model_validator(mode="after")
-    def require_langsmith_tracing(self) -> "Settings":
-        if not self.langsmith_tracing:
-            raise ValueError("LANGSMITH_TRACING must be true because LangSmith tracing is required")
+    def require_secure_cross_site_cookies(self) -> "Settings":
         if self.cookie_samesite == "none" and not self.cookie_secure:
             raise ValueError("COOKIE_SECURE must be true when COOKIE_SAMESITE=none")
         return self

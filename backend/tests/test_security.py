@@ -4,9 +4,6 @@ os.environ.setdefault("SUPABASE_URL", "https://example.supabase.co")
 os.environ.setdefault("SUPABASE_SECRET_KEY", "test-key")
 os.environ.setdefault("JWT_SECRET", "a-test-secret-that-is-long-enough")
 os.environ.setdefault("GEMINI_API_KEY", "test-key")
-os.environ.setdefault("LANGSMITH_TRACING", "true")
-os.environ.setdefault("LANGSMITH_API_KEY", "test-key")
-os.environ.setdefault("LANGSMITH_PROJECT", "gradeflow-test")
 
 from app.core.security import create_access_token, decode_access_token, hash_password, verify_password
 from app.core.config import Settings
@@ -32,9 +29,6 @@ def test_frontend_origin_list_is_normalized():
         supabase_secret_key="test-key",
         jwt_secret="a-test-secret-that-is-long-enough",
         gemini_api_key="test-key",
-        langsmith_tracing=True,
-        langsmith_api_key="test-key",
-        langsmith_project="gradeflow-test",
         frontend_origin="https://app.example.com/",
         frontend_origins="https://app.example.com, https://www.example.com/",
         cookie_secure=True,

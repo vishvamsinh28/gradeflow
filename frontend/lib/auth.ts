@@ -52,9 +52,16 @@ export function validateName(value: string): string | null {
 
 /* ---------- API mode ---------- */
 
+/**
+ * The http-only cookie is the primary session. This mirror exists because a
+ * cookie cannot be read back when the API is on another origin and the browser
+ * declines to send it — keeping it in localStorage rather than sessionStorage
+ * is what makes a session survive closing the tab. It is the same XSS exposure
+ * either way; only the lifetime differs.
+ */
 function readToken(): string | null {
   try {
-    return sessionStorage.getItem(TOKEN_KEY);
+    return localStorage.getItem(TOKEN_KEY);
   } catch {
     return null;
   }
@@ -62,10 +69,12 @@ function readToken(): string | null {
 
 function writeToken(token: string | null) {
   try {
-    if (token) sessionStorage.setItem(TOKEN_KEY, token);
-    else sessionStorage.removeItem(TOKEN_KEY);
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+    // Clear the older per-tab location so a stale token cannot shadow this one.
+    sessionStorage.removeItem(TOKEN_KEY);
   } catch {
-    // Session storage can be blocked; the http-only cookie still carries auth.
+    // Storage can be blocked; the http-only cookie still carries the session.
   }
 }
 
