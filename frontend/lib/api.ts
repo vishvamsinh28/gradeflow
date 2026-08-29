@@ -8,6 +8,7 @@
  */
 
 import { authHeaders, AuthError } from "./auth";
+import { apiUrl } from "./runtime-config";
 import type {
   Classroom,
   ClassroomReport,
@@ -20,7 +21,7 @@ import type {
   UploadOutcome,
 } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
 
 export class ApiError extends Error {
   constructor(
@@ -32,13 +33,13 @@ export class ApiError extends Error {
 }
 
 export function apiConfigured(): boolean {
-  return Boolean(API_URL);
+  return Boolean(apiUrl());
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  if (!API_URL) {
+  if (!apiUrl()) {
     throw new ApiError(
-      "No API is configured. Set NEXT_PUBLIC_API_URL so your work is saved.",
+      "No API is configured. Set API_URL so your work is saved.",
       0,
     );
   }
@@ -51,7 +52,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    response = await fetch(`${apiUrl()}${path}`, {
       ...init,
       headers,
       credentials: "include",
@@ -172,8 +173,8 @@ export function uploadSheets(testId: string, files: File[]): Promise<UploadOutco
 
 /** The sheet itself, so a teacher can check a mark against the paper. */
 export async function fetchSheet(submissionId: string): Promise<string> {
-  if (!API_URL) throw new ApiError("No API is configured.", 0);
-  const response = await fetch(`${API_URL}/sheets/${submissionId}/file`, {
+  if (!apiUrl()) throw new ApiError("No API is configured.", 0);
+  const response = await fetch(`${apiUrl()}/sheets/${submissionId}/file`, {
     headers: authHeaders(),
     credentials: "include",
     cache: "no-store",
@@ -199,8 +200,8 @@ export const regradeTest = (testId: string, correction: string, onlyFlagged = fa
 /* ---------- sharing ---------- */
 
 export async function fetchShared(token: string): Promise<ShareResult> {
-  if (!API_URL) throw new ApiError("No API is configured.", 0);
-  const response = await fetch(`${API_URL}/share/${token}`, { cache: "no-store" });
+  if (!apiUrl()) throw new ApiError("No API is configured.", 0);
+  const response = await fetch(`${apiUrl()}/share/${token}`, { cache: "no-store" });
   if (!response.ok) throw new ApiError("This results link is not valid.", response.status);
   return (await response.json()) as ShareResult;
 }

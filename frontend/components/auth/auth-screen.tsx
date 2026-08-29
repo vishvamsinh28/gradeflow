@@ -179,7 +179,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
               {!apiConfigured() ? (
                 <p className="mt-8 rounded-md border border-warn-line bg-warn-soft px-3 py-2.5 text-[12px] leading-relaxed text-warn">
                   No API is configured, so nothing can be saved. Set{" "}
-                  <code className="font-mono">NEXT_PUBLIC_API_URL</code> and restart the app.
+                  <code className="font-mono">API_URL</code> and restart the app.
                 </p>
               ) : null}
             </div>

@@ -69,10 +69,10 @@ This runs `backend/supabase/schema.sql` and the migrations through `psql`, so yo
 PostgreSQL client tools installed (`brew install libpq` on macOS, `apt install
 postgresql-client` on Debian/Ubuntu).
 
-**4. Point the frontend at the API.** Uncomment the last line of `frontend/.env.local`:
+**4. Point the frontend at the API.** Set it in `frontend/.env.local`:
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+API_URL=http://localhost:8000/api/v1
 ```
 
 **5. Run both services.**
@@ -97,7 +97,7 @@ Frontend on <http://localhost:3000>, API on <http://localhost:8000>. `Ctrl+C` st
 ### If something goes wrong
 
 - **`Cannot reach the GradeFlow server` on sign-in** — the frontend has
-  `NEXT_PUBLIC_API_URL` set but the API is not running. Start it with `make backend`, or
+  `API_URL` set but the API is not running. Start it with `make backend`, or
   comment the variable out to go back to browser-local accounts.
 - **`Supabase schema is not ready`** — the tables do not exist yet. Run `make db-setup`,
   wait a few seconds for Supabase's schema cache, and retry.
@@ -162,7 +162,7 @@ has two backends behind one interface:
 
 | Mode | When | What happens |
 | --- | --- | --- |
-| `api` | `NEXT_PUBLIC_API_URL` is set | Real accounts against the FastAPI service — bcrypt hashing, JWT in an http-only cookie, Bearer fallback for preview deployments |
+| `api` | `API_URL` is set | Real accounts against the FastAPI service — bcrypt hashing, JWT in an http-only cookie, Bearer fallback for preview deployments |
 | `local` | no API configured | Accounts live in this browser so the product runs with no server. Passwords are PBKDF2-hashed rather than stored, but this is **not** a security boundary — it exists so the app can be run and demonstrated |
 
 `/app` and everything under it redirect to `/signin` without a session. A new account starts
@@ -248,7 +248,7 @@ custom JWT auth, Gemini multimodal extraction and grading, and a LangGraph gradi
 See [`backend/supabase/schema.sql`](backend/supabase/schema.sql) and `backend/app/`.
 
 **Auth is already wired up.** `/auth/register`, `/auth/login`, `/auth/logout` and `/auth/me`
-back the sign-in and sign-up screens whenever `NEXT_PUBLIC_API_URL` is set.
+back the sign-in and sign-up screens whenever `API_URL` is set.
 
 **The rest has not been migrated to the redesigned domain model yet.** It still models
 `classes → assignments (answer_key, rubric, total_points) → submissions`, so classrooms,

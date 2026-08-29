@@ -1,5 +1,7 @@
 "use client";
 
+import { apiUrl } from "./runtime-config";
+
 /**
  * Accounts.
  *
@@ -8,7 +10,7 @@
  * account that cannot do anything.
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
 
 export type User = {
   id: string;
@@ -21,7 +23,7 @@ export class AuthError extends Error {}
 const TOKEN_KEY = "gradeflow.token";
 
 export function apiConfigured(): boolean {
-  return Boolean(API_URL);
+  return Boolean(apiUrl());
 }
 
 /* ---------- validation ---------- */
@@ -75,9 +77,9 @@ export function authHeaders(): Record<string, string> {
 }
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
-  if (!API_URL) {
+  if (!apiUrl()) {
     throw new AuthError(
-      "No API is configured. Set NEXT_PUBLIC_API_URL so accounts and marks can be saved.",
+      "No API is configured. Set API_URL so accounts and marks can be saved.",
     );
   }
 
@@ -87,7 +89,7 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    response = await fetch(`${apiUrl()}${path}`, {
       ...init,
       headers,
       credentials: "include",
@@ -147,7 +149,7 @@ export async function signOut(): Promise<void> {
 }
 
 export async function currentUser(): Promise<User | null> {
-  if (!API_URL) return null;
+  if (!apiUrl()) return null;
   try {
     return toUser(await call<ApiUser>("/auth/me"));
   } catch {

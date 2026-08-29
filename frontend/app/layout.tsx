@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Instrument_Sans, Instrument_Serif, IBM_Plex_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { apiUrlScript } from "@/lib/runtime-config";
 import "./globals.css";
 
 const sans = Instrument_Sans({
@@ -34,6 +35,11 @@ export const metadata: Metadata = {
     "Upload answer sheets, let AI grade them, and manage your classroom, marks, and attendance from one simple workspace.",
 };
 
+/* Rendered per request so API_URL is read at runtime. Without this the value
+   would be captured when the page was built, which is the problem we are
+   solving. */
+export const dynamic = "force-dynamic";
+
 export const viewport: Viewport = {
   themeColor: "#0a1017",
   width: "device-width",
@@ -43,6 +49,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${sans.variable} ${serif.variable} ${mono.variable}`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: apiUrlScript() }} />
+      </head>
       <body>
         {children}
         <Analytics />

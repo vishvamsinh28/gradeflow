@@ -8,7 +8,10 @@ version = "0.1.0"
 description = "FastAPI, Supabase, Gemini and LangGraph grading MVP"
 requires-python = ">=3.11,<3.14"
 dependencies = [
-  "fastapi>=0.115,<1",
+  # `standard` is required, not cosmetic: it ships the `fastapi` CLI that
+  # FastAPI Cloud uses to deploy and run this app. Dropping it means no
+  # `fastapi` command, and no way to ship.
+  "fastapi[standard]>=0.115,<1",
   "uvicorn[standard]>=0.34,<1",
   "pydantic>=2.10,<3",
   "pydantic-settings>=2.7,<3",
