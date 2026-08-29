@@ -16,7 +16,10 @@ drop table if exists public.assignments cascade;
 drop table if exists public.students cascade;
 drop table if exists public.classes cascade;
 
--- The old submission bucket goes with them. Objects must be cleared first;
--- the bucket row cannot be deleted while it still holds files.
-delete from storage.objects where bucket_id = 'submissions';
-delete from storage.buckets where id = 'submissions';
+-- The old `submissions` bucket goes with them, but not from here: Supabase
+-- guards storage.objects with a trigger that rejects direct deletes, so this
+-- has to go through the Storage API. Run:
+--
+--   backend/.venv/bin/python -m app.scripts.drop_legacy_bucket
+--
+-- It is safe to run before or after this migration, and safe to re-run.
