@@ -56,10 +56,10 @@ export default function ClassroomLayout({ children }) {
   const router = useRouter();
   const confirm = useConfirm();
   const toast = useToast();
-  const { data: classroom, loading } = useClassroom(params.classroom);
+  const { data: classroom, missing, error } = useClassroom(params.classroom);
   const { newTest, addStudents } = useWorkspaceActions();
   const [renaming, setRenaming] = useState(false);
-  if (loading && !classroom) {
+  if (!classroom && !missing && !error) {
     return (
       <div className="mx-auto w-full max-w-[1360px] px-4 py-10 sm:px-6">
         <div className="skeleton h-7 w-52 rounded-md" />

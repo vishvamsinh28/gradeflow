@@ -65,7 +65,7 @@ export default function TestWorkspacePage() {
   const router = useRouter();
   const confirm = useConfirm();
   const toast = useToast();
-  const { data: workspace, loading, error, reload } = useTestWorkspace(params.testId);
+  const { data: workspace, missing, error, reload } = useTestWorkspace(params.testId);
   // /tests/{id} carries the classroom already; fetching it separately was both
   // a wasted round trip and the reason this screen flashed "Test not found".
   const classroom = workspace?.classroom;
@@ -126,7 +126,9 @@ export default function TestWorkspacePage() {
     },
     [stepIndex, stepList],
   );
-  if (loading && !workspace) {
+  // Only a real 404 or a real failure ends the wait — an empty cache means a
+  // fetch is (still) on its way, so anything else stays on the skeleton.
+  if (!workspace && !missing && !error) {
     return (
       <div>
         <div className="skeleton h-7 w-64 rounded-md" />
@@ -164,12 +166,12 @@ export default function TestWorkspacePage() {
     review: rows.filter((row) => row.submission?.needs_review).length,
     absent: rows.filter((row) => row.absent).length,
   };
-  async function upload(files) {
+  async function upload(files, studentId) {
     if (!test) return;
     setUploading(true);
     setOutcome(null);
     try {
-      const result = await uploadSheets(test.id, files);
+      const result = await uploadSheets(test.id, files, studentId);
       setOutcome(result);
       const count = result.submissions.length;
       toast(
@@ -324,15 +326,33 @@ export default function TestWorkspacePage() {
         </div>
       ) : null}
 
-      {counts.awaiting > 0 || submissions.length === 0 ? (
+      {students.length === 0 ? (
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-dashed border-line-strong bg-surface-2/50 px-4 py-3">
+          <p className="text-[13px] text-ink-2">
+            Add students before collecting answers — sheets need someone to belong to.
+          </p>
+          <Button size="sm" onClick={() => router.push(`/app/${classroom.slug}/students`)}>
+            Add students
+          </Button>
+        </div>
+      ) : questions.length === 0 ? (
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-dashed border-line-strong bg-surface-2/50 px-4 py-3">
+          <p className="text-[13px] text-ink-2">
+            Add the question paper first — answers are marked against it.
+          </p>
+          <Button size="sm" variant="primary" onClick={() => setPaperOpen(true)}>
+            Add the question paper
+          </Button>
+        </div>
+      ) : counts.awaiting > 0 || submissions.length === 0 ? (
         <div className="mt-4">
           <Dropzone
             multiple
             accept="image/*,application/pdf"
             disabled={uploading}
-            onFiles={upload}
+            onFiles={(files) => void upload(files)}
             title={uploading ? "Uploading and reading the sheets…" : "Drop the answer sheets"}
-            hint="One file per student, or a single PDF holding the whole class — it is split by reading the name on each page."
+            hint="One file per student, or a single PDF holding the whole class — it is split by reading the name on each page. Unnamed files are matched by reading the sheet."
             icon={uploading ? <Spinner size={16} /> : undefined}
           />
         </div>
@@ -425,7 +445,8 @@ export default function TestWorkspacePage() {
                 testId={test.id}
                 maxMarks={test.max_marks}
                 onOpen={() => submission?.status === "graded" && setOpenResultId(submission.id)}
-                onUpload={(files) => void upload(files)}
+                canUpload={questions.length > 0}
+                onUpload={(files) => void upload(files, student.id)}
               />
             ))}
           </ul>
@@ -461,6 +482,7 @@ export default function TestWorkspacePage() {
         onClose={() => setEditOpen(false)}
         test={test}
         subjects={classroom.subjects}
+        hasPaper={questions.length > 0}
       />
 
       <ResultSheet
@@ -484,7 +506,7 @@ export default function TestWorkspacePage() {
 
 /* ---------- roster row ---------- */
 
-function RosterRow({ student, submission, absent, testId, maxMarks, onOpen, onUpload }) {
+function RosterRow({ student, submission, absent, testId, maxMarks, onOpen, onUpload, canUpload }) {
   const graded = submission?.status === "graded";
   const percent =
     graded && submission.out_of ? ((submission.score ?? 0) / submission.out_of) * 100 : null;
@@ -496,6 +518,7 @@ function RosterRow({ student, submission, absent, testId, maxMarks, onOpen, onUp
         submission={submission}
         absent={absent}
         testId={testId}
+        canUpload={canUpload}
         onUpload={onUpload}
       />
     </>
@@ -593,7 +616,7 @@ function ResultCell({ submission, absent, graded, percent, maxMarks }) {
   if (submission) return <span className="text-[12.5px] text-ink-3">Ready</span>;
   return <span className="text-[12.5px] text-ink-4">&mdash;</span>;
 }
-function AnswerCell({ student, submission, absent, testId, onUpload }) {
+function AnswerCell({ student, submission, absent, testId, canUpload, onUpload }) {
   const inputRef = useRef(null);
   const toast = useToast();
   if (absent) return <span className="text-[12.5px] text-ink-4">No sheet expected</span>;
@@ -644,7 +667,9 @@ function AnswerCell({ student, submission, absent, testId, onUpload }) {
       />
       <button
         onClick={() => inputRef.current?.click()}
-        className="inline-flex h-6 items-center gap-1.5 rounded-md border border-dashed border-line-strong px-2 text-[12px] font-medium text-ink-3 transition-colors hover:border-accent-line hover:bg-accent-soft hover:text-accent"
+        disabled={!canUpload}
+        title={canUpload ? undefined : "Add the question paper first"}
+        className="inline-flex h-6 items-center gap-1.5 rounded-md border border-dashed border-line-strong px-2 text-[12px] font-medium text-ink-3 transition-colors hover:border-accent-line hover:bg-accent-soft hover:text-accent disabled:cursor-not-allowed disabled:opacity-45"
       >
         <IconUpload size={11} />
         Upload
@@ -697,7 +722,7 @@ function AttendanceToggle({ testId, studentId, absent, locked }) {
 
 /* ---------- edit ---------- */
 
-function EditTestDialog({ open, onClose, test, subjects }) {
+function EditTestDialog({ open, onClose, test, subjects, hasPaper }) {
   const toast = useToast();
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
@@ -778,11 +803,16 @@ function EditTestDialog({ open, onClose, test, subjects }) {
           <Field label="Title" optional>
             <Input value={title} onChange={(event) => setTitle(event.target.value)} />
           </Field>
-          <Field label="Total marks" optional>
+          <Field
+            label="Total marks"
+            optional
+            hint={hasPaper ? "Set by the question paper." : undefined}
+          >
             <Input
               type="number"
               min={1}
               value={maxMarks}
+              disabled={hasPaper}
               onChange={(event) => setMaxMarks(event.target.value)}
             />
           </Field>

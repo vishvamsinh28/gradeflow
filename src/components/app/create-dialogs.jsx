@@ -7,7 +7,13 @@ import { Select } from "@/components/ui/select";
 import { DateField } from "@/components/ui/date-field";
 import { Dialog, useToast } from "@/components/ui/overlays";
 import { IconPlus, IconSparkle, IconX } from "@/components/ui/icons";
-import { createClassroom, createTest } from "@/lib/workspace";
+import { createClassroom, createTest, saveQuestions } from "@/lib/workspace";
+import { extractQuestionsForClassroom } from "@/lib/api";
+import {
+  BLANK_QUESTION,
+  QuestionRowsEditor,
+  usableQuestions,
+} from "@/components/app/question-paper";
 import { todayISO } from "@/lib/format";
 const SUBJECT_SUGGESTIONS = [
   "Mathematics",
@@ -194,6 +200,8 @@ export function CreateTestDialog({ open, onClose, classroom }) {
   const [title, setTitle] = useState("");
   const [maxMarks, setMaxMarks] = useState("100");
   const [instructions, setInstructions] = useState("");
+  const [paperOpen, setPaperOpen] = useState(false);
+  const [rows, setRows] = useState([]);
   useEffect(() => {
     if (!open) return;
     setDate(todayISO());
@@ -201,8 +209,17 @@ export function CreateTestDialog({ open, onClose, classroom }) {
     setTitle("");
     setMaxMarks("100");
     setInstructions("");
+    setPaperOpen(false);
+    setRows([]);
   }, [open, classroom]);
-  const marks = useMemo(() => Number(maxMarks) || 100, [maxMarks]);
+  // The paper owns the total once it has questions; the manual box owns it
+  // until then.
+  const paper = useMemo(() => usableQuestions(rows), [rows]);
+  const paperTotal = paper.reduce((sum, question) => sum + question.marks, 0);
+  const marks = useMemo(
+    () => (paper.length > 0 ? paperTotal : Number(maxMarks) || 100),
+    [paper.length, paperTotal, maxMarks],
+  );
   const [saving, setSaving] = useState(false);
   async function submit() {
     if (!classroom || !date || saving) return;
@@ -215,8 +232,28 @@ export function CreateTestDialog({ open, onClose, classroom }) {
         instructions: instructions || undefined,
         max_marks: marks,
       });
+      if (paper.length > 0) {
+        // The test exists either way; a failed paper save should land the
+        // teacher on the test page with a clear message, not undo the test.
+        try {
+          await saveQuestions(test.id, paper);
+        } catch {
+          toast(
+            "Test created, but the question paper did not save — add it on the test page",
+            "error",
+          );
+          onClose();
+          router.push(`/app/${classroom.slug}/tests/${test.id}`);
+          return;
+        }
+      }
       onClose();
-      toast("Test created — upload answer sheets when you're ready", "success");
+      toast(
+        paper.length > 0
+          ? `Test created with ${paper.length} question${paper.length === 1 ? "" : "s"}`
+          : "Test created — upload answer sheets when you're ready",
+        "success",
+      );
       router.push(`/app/${classroom.slug}/tests/${test.id}`);
     } catch (error) {
       toast(error instanceof Error ? error.message : "Could not create that test", "error");
@@ -230,7 +267,7 @@ export function CreateTestDialog({ open, onClose, classroom }) {
       onClose={onClose}
       title="New test"
       description={classroom ? `In ${classroom.name}` : undefined}
-      width={520}
+      width={560}
       footer={
         <>
           <Button size="sm" onClick={onClose}>
@@ -287,14 +324,53 @@ export function CreateTestDialog({ open, onClose, classroom }) {
               placeholder="Unit Test 3"
             />
           </Field>
-          <Field label="Total marks" optional>
+          <Field
+            label="Total marks"
+            optional
+            hint={paper.length > 0 ? "Set by the question paper." : undefined}
+          >
             <Input
               type="number"
               min={1}
-              value={maxMarks}
+              value={paper.length > 0 ? String(paperTotal) : maxMarks}
+              disabled={paper.length > 0}
               onChange={(event) => setMaxMarks(event.target.value)}
             />
           </Field>
+        </div>
+
+        <div className="rounded-lg border border-line">
+          <button
+            type="button"
+            onClick={() => {
+              setPaperOpen((value) => !value);
+              if (!paperOpen && rows.length === 0) setRows([{ ...BLANK_QUESTION }]);
+            }}
+            aria-expanded={paperOpen}
+            className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left transition-colors hover:bg-surface-2"
+          >
+            <IconSparkle size={14} className="shrink-0 text-accent" />
+            <span className="flex-1 text-[13px] font-medium text-ink">
+              Question paper
+              <span className="ml-1.5 font-normal text-ink-4">Optional</span>
+            </span>
+            <span className="text-[12.5px] text-ink-3">
+              {paper.length > 0
+                ? `${paper.length} question${paper.length === 1 ? "" : "s"} · ${paperTotal} marks`
+                : paperOpen
+                  ? "Hide"
+                  : "Write it or photograph it"}
+            </span>
+          </button>
+          {paperOpen ? (
+            <div className="border-t border-line px-3.5 py-3.5">
+              <QuestionRowsEditor
+                rows={rows}
+                onRows={setRows}
+                extract={(file) => extractQuestionsForClassroom(classroom.id, file)}
+              />
+            </div>
+          ) : null}
         </div>
 
         <Field

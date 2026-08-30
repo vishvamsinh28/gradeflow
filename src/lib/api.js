@@ -7,6 +7,7 @@
  * server. Nothing in this app writes teaching data to the browser.
  */
 import { AuthError } from "./auth";
+import { shrinkImage } from "./images";
 export class ApiError extends Error {
   constructor(message, status) {
     super(message);
@@ -32,7 +33,12 @@ async function request(path, init = {}) {
   if (response.status === 401) throw new AuthError("Your session has expired. Sign in again.");
   if (!response.ok) {
     const body = await response.json().catch(() => null);
-    const detail = typeof body?.detail === "string" ? body.detail : "Something went wrong.";
+    const detail =
+      typeof body?.detail === "string"
+        ? body.detail
+        : response.status === 413
+          ? "That upload is too large. Keep files under about 4MB each."
+          : "Something went wrong.";
     throw new ApiError(detail, response.status);
   }
   if (response.status === 204) return undefined;
@@ -130,9 +136,11 @@ export const setAttendance = (testId, entries) =>
   });
 
 /** Read a photographed class register into a list the teacher can edit. */
-export function extractStudents(classroomId, file) {
+export async function extractStudents(classroomId, file) {
   const form = new FormData();
-  form.append("file", file);
+  const prepared = await shrinkImage(file);
+  assertUploadable(prepared);
+  form.append("file", prepared);
   return request(`/classrooms/${classroomId}/students/extract`, {
     method: "POST",
     body: form,
@@ -148,10 +156,24 @@ export const saveQuestions = (testId, questions) =>
   });
 
 /** Read a photographed question paper. Images and PDFs both work. */
-export function extractQuestions(testId, file) {
+export async function extractQuestions(testId, file) {
   const form = new FormData();
-  form.append("file", file);
+  const prepared = await shrinkImage(file);
+  assertUploadable(prepared);
+  form.append("file", prepared);
   return request(`/tests/${testId}/questions/extract`, {
+    method: "POST",
+    body: form,
+  });
+}
+
+/** The same read, before the test exists — used by the create-test dialog. */
+export async function extractQuestionsForClassroom(classroomId, file) {
+  const form = new FormData();
+  const prepared = await shrinkImage(file);
+  assertUploadable(prepared);
+  form.append("file", prepared);
+  return request(`/classrooms/${classroomId}/questions/extract`, {
     method: "POST",
     body: form,
   });
@@ -159,9 +181,31 @@ export function extractQuestions(testId, file) {
 
 /* ---------- answer sheets ---------- */
 
-export function uploadSheets(testId, files) {
+// Vercel refuses request bodies past ~4.5MB before the app runs, so anything
+// still over the line after shrinking gets a named refusal, not a mystery.
+const UPLOAD_LIMIT = 4 * 1024 * 1024;
+
+function assertUploadable(file) {
+  if (file.size > UPLOAD_LIMIT) {
+    throw new ApiError(
+      `"${file.name}" is ${(file.size / 1048576).toFixed(1)}MB — the upload limit is 4MB. ` +
+        (file.type === "application/pdf"
+          ? "Export the PDF at a lower quality, or split it."
+          : "Use a smaller photo."),
+      413,
+    );
+  }
+}
+
+export async function uploadSheets(testId, files, studentId) {
   const form = new FormData();
-  files.forEach((file) => form.append("files", file));
+  for (const file of files) {
+    const prepared = await shrinkImage(file);
+    assertUploadable(prepared);
+    form.append("files", prepared);
+  }
+  // Named student: the sheet is theirs, no matching involved.
+  if (studentId) form.append("student_id", studentId);
   return request(`/tests/${testId}/submissions`, {
     method: "POST",
     body: form,

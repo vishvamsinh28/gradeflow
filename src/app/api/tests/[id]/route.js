@@ -82,7 +82,12 @@ export const PATCH = route(async (request, { params }) => {
   if (input.test_date != null) data.test_date = new Date(`${input.test_date}T00:00:00Z`);
   if (input.title !== undefined) data.title = input.title?.trim() || null;
   if (input.instructions !== undefined) data.instructions = input.instructions?.trim() || null;
-  if (input.max_marks != null) data.max_marks = input.max_marks;
+  if (input.max_marks != null) {
+    // Once a paper exists, its marks are the total — a hand-edited number here
+    // would let question marks disagree with the test total.
+    const questionCount = await db.test_questions.count({ where: { test_id: id } });
+    if (!questionCount) data.max_marks = input.max_marks;
+  }
   data.subjects = input.subject_id
     ? {
         connect: {

@@ -7,8 +7,9 @@
  * the server and the cache is refreshed from what comes back, so a reload, a
  * second device or a cleared browser all show the same thing.
  */
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import * as api from "./api";
+import { ApiError } from "./api";
 let cache = {
   classrooms: null,
   byId: {},
@@ -40,6 +41,41 @@ function useCache() {
   return useSyncExternalStore(subscribe, snapshot, snapshot);
 }
 
+/**
+ * Run a load, and stand guard over the OUTCOME.
+ *
+ * Two wedges observed in production, both leaving a permanent skeleton with
+ * the data already fetched: an async continuation that never resumes, and a
+ * completed React render that never commits (the alternate fiber held the
+ * finished state). The guard doesn't trust either layer — until the render
+ * itself shows data or a verdict, it re-fires the load (fresh task, covers a
+ * lost continuation) and forces a state update (fresh commit, covers a lost
+ * one). `outcomeVisible` is evaluated in render, so it reports what the user
+ * actually sees.
+ */
+function useGuardedLoad(reload, outcomeVisible, shouldRun = true) {
+  const outcomeRef = useRef(outcomeVisible);
+  outcomeRef.current = outcomeVisible;
+  const [, forceRender] = useState(0);
+  useEffect(() => {
+    if (!shouldRun) return;
+    void reload();
+    let tries = 0;
+    const guard = window.setInterval(() => {
+      if (outcomeRef.current || tries >= 8) {
+        window.clearInterval(guard);
+        return;
+      }
+      tries += 1;
+      void reload();
+      forceRender((n) => n + 1);
+    }, 1500);
+    return () => window.clearInterval(guard);
+    // outcomeRef mirrors render state; shouldRun only gates the first run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reload]);
+}
+
 /* ---------- loading ---------- */
 
 export function useClassrooms() {
@@ -58,10 +94,10 @@ export function useClassrooms() {
       setLoading(false);
     }
   }, []);
+  useGuardedLoad(reload, classrooms !== null || Boolean(error), cache.classrooms === null);
   useEffect(() => {
-    if (cache.classrooms === null) void reload();
-    else setLoading(false);
-  }, [reload]);
+    if (cache.classrooms !== null) setLoading(false);
+  }, []);
   return {
     data: classrooms,
     loading,
@@ -73,31 +109,32 @@ export function useClassroom(slug) {
   const { classrooms } = useCache();
   const found = classrooms?.find((classroom) => classroom.slug === slug) ?? null;
   const [loading, setLoading] = useState(!found);
+  // "Not found" is the server's verdict (a real 404), never an inference from
+  // an empty cache — a fetch still in flight must read as loading, or a slow
+  // first load renders a false "deleted" screen.
+  const [missing, setMissing] = useState(false);
   const [error, setError] = useState(null);
   const reload = useCallback(async () => {
     setLoading(true);
     try {
       const fresh = await api.getClassroom(slug);
       replaceClassroom(fresh);
+      setMissing(false);
       setError(null);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not load this classroom.");
+      if (caught instanceof ApiError && caught.status === 404) setMissing(true);
+      else setError(caught instanceof Error ? caught.message : "Could not load this classroom.");
     } finally {
       setLoading(false);
     }
   }, [slug]);
-  useEffect(() => {
-    // Already cached from the dashboard list — no reason to fetch it again on
-    // every navigation. `reload()` is still there when freshness matters.
-    if (found) {
-      setLoading(false);
-      return;
-    }
-    void reload();
-  }, [reload, found]);
+  // Already cached from the dashboard list — no reason to fetch again on every
+  // navigation. `reload()` is still there when freshness matters.
+  useGuardedLoad(reload, Boolean(found) || missing || Boolean(error), !found);
   return {
     data: found,
     loading: loading && !found,
+    missing,
     error,
     reload,
   };
@@ -106,6 +143,7 @@ export function useTestWorkspace(testId) {
   const { byId } = useCache();
   const found = byId[testId] ?? null;
   const [loading, setLoading] = useState(!found);
+  const [missing, setMissing] = useState(false);
   const [error, setError] = useState(null);
   const reload = useCallback(async () => {
     try {
@@ -113,17 +151,17 @@ export function useTestWorkspace(testId) {
         ...cache.byId,
         [testId]: await api.getTest(testId),
       };
+      setMissing(false);
       setError(null);
       emit();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not load this test.");
+      if (caught instanceof ApiError && caught.status === 404) setMissing(true);
+      else setError(caught instanceof Error ? caught.message : "Could not load this test.");
     } finally {
       setLoading(false);
     }
   }, [testId]);
-  useEffect(() => {
-    void reload();
-  }, [reload]);
+  useGuardedLoad(reload, Boolean(found) || missing || Boolean(error));
 
   // Grading happens on the server, so the only way to watch it is to ask.
   const grading =
@@ -137,6 +175,7 @@ export function useTestWorkspace(testId) {
   return {
     data: found,
     loading,
+    missing,
     error,
     reload,
   };
@@ -323,8 +362,8 @@ export async function setAttendance(testId, entries) {
   await api.setAttendance(testId, entries);
   await refreshTest(testId);
 }
-export async function uploadSheets(testId, files) {
-  const outcome = await api.uploadSheets(testId, files);
+export async function uploadSheets(testId, files, studentId) {
+  const outcome = await api.uploadSheets(testId, files, studentId);
   await refreshTest(testId);
   return outcome;
 }

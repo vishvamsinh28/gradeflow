@@ -1,20 +1,22 @@
 import { requireUser } from "@/lib/server/auth";
 import { ApiError, json, route } from "@/lib/server/http";
-import { ownedTest } from "@/lib/server/domain";
+import { ownedClassroom } from "@/lib/server/domain";
 import { readQuestionPaper } from "@/lib/server/grader";
 import { rateLimit } from "@/lib/server/rate-limit";
 import { readExtractUpload } from "@/lib/server/uploads";
 
 /**
- * Read a photographed or scanned question paper into a list of questions.
+ * Read a question paper before the test exists.
  *
- * Nothing is written here — the teacher reviews and edits before saving, so
- * extraction stays a read and the paper is stored through PUT /questions.
+ * The create-test dialog offers the paper up front, so extraction here is
+ * scoped to the classroom rather than to a test id that has not been issued
+ * yet. Nothing is written — the teacher reviews the questions in the dialog
+ * and they are stored with the test they came in with.
  */
 export const POST = route(async (request, { params }) => {
   const user = await requireUser(request);
   const { id } = await params;
-  await ownedTest(id, user.id);
+  await ownedClassroom(id, user.id);
   // Every call here is a model call billed to the account.
   await rateLimit(`extract:${user.id}`, { limit: 30, windowSeconds: 3600 });
 
@@ -29,5 +31,5 @@ export const POST = route(async (request, { params }) => {
   }
 });
 
-// Reading a page is one long model call; keep Vercel from cutting it off.
+// Reading a paper is one long model call; keep Vercel from cutting it off.
 export const maxDuration = 60;

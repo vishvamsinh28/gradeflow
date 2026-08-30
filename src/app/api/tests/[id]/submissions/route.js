@@ -20,6 +20,8 @@ import {
   uploadSheet,
 } from "@/lib/server/storage";
 
+const MAX_AI_MATCHES = 8;
+
 /**
  * Accept whatever the scanner produced.
  *
@@ -40,77 +42,139 @@ export const POST = route(async (request, { params }) => {
       `That is ${files.length} files. Upload at most ${MAX_FILES} at a time.`,
     );
   }
+  const anyStudents = await db.classroom_students.count({ where: { classroom_id: classroom.id } });
+  if (!anyStudents) {
+    throw new ApiError(400, "Add students to this classroom before uploading answer sheets.");
+  }
+  const questionCount = await db.test_questions.count({ where: { test_id: id } });
+  if (!questionCount) {
+    throw new ApiError(400, "Add the question paper first — answers are marked against it.");
+  }
   const students = await presentStudents(id, classroom.id);
   if (!students.length) {
     throw new ApiError(400, "Every student is marked absent for this test");
   }
+
   const taken = new Set();
   const prepared = [];
   const unmatched = [];
-  for (const file of files) {
-    const { content, mime } = await readUpload(file);
-    const name = file.name || "sheet";
-    const pages = mime === "application/pdf" ? await pdfPageCount(content) : 1;
-    if (pages > MAX_PDF_PAGES) {
-      throw new ApiError(
-        413,
-        `${name} has ${pages} pages. Split it into batches of ${MAX_PDF_PAGES} or fewer.`,
-      );
+  const pendingAiMatch = [];
+
+  // The Upload button on a student's row names its student outright — no
+  // matching, no guessing, exactly what the unmatched-sheet notice promises.
+  const directStudentId = form.get("student_id");
+  if (typeof directStudentId === "string" && directStudentId) {
+    const target = students.find((student) => student.id === directStudentId);
+    if (!target) {
+      throw new ApiError(422, "That student is not in this classroom, or is marked absent.");
     }
-    if (pages > 1 && files.length === 1) {
-      // A whole class in one PDF: ask which name is on each page, group
-      // continuation pages onto the sheet they belong to, then split.
-      let pageNames;
-      try {
-        pageNames = await identifyPages(content, mime, pages);
-      } catch (error) {
-        console.error(`Could not read names from ${name}:`, error);
-        throw new ApiError(
-          422,
-          "Could not read the names in that PDF. Try uploading one file per student.",
-        );
-      }
-      for (const group of groupPagesByStudent(pageNames)) {
-        const studentId = matchNameToStudent(
-          group.name,
-          students.filter((student) => !taken.has(student.id)),
-        );
-        const sheet = {
-          fileName: `${slugify(group.name || "sheet")}-p${group.first}.pdf`,
-          mimeType: mime,
-          content: await extractPdfPages(content, group.first, group.last),
-          pageFrom: group.first,
-          pageTo: group.last,
-        };
-        if (studentId) {
-          taken.add(studentId);
-          prepared.push({
-            studentId,
-            sheet,
-            byAi: true,
-          });
-        } else {
-          unmatched.push(`pages ${group.first}-${group.last}`);
-        }
-      }
-      continue;
-    }
-    const studentId = matchByFilename(name, students, taken);
-    const sheet = {
-      fileName: name,
-      mimeType: mime,
-      content,
-    };
-    if (studentId) {
-      taken.add(studentId);
+    for (const file of files) {
+      const { content, mime } = await readUpload(file);
       prepared.push({
-        studentId,
-        sheet,
+        studentId: target.id,
+        sheet: { fileName: file.name || "sheet", mimeType: mime, content },
         byAi: false,
       });
-    } else {
-      unmatched.push(name);
     }
+  } else
+    for (const file of files) {
+      const { content, mime } = await readUpload(file);
+      const name = file.name || "sheet";
+      const pages = mime === "application/pdf" ? await pdfPageCount(content) : 1;
+      if (pages > MAX_PDF_PAGES) {
+        throw new ApiError(
+          413,
+          `${name} has ${pages} pages. Split it into batches of ${MAX_PDF_PAGES} or fewer.`,
+        );
+      }
+      if (pages > 1 && files.length === 1) {
+        // A whole class in one PDF: ask which name is on each page, group
+        // continuation pages onto the sheet they belong to, then split.
+        let pageNames;
+        try {
+          pageNames = await identifyPages(content, mime, pages);
+        } catch (error) {
+          console.error(`Could not read names from ${name}:`, error);
+          throw new ApiError(
+            422,
+            "Could not read the names in that PDF. Try uploading one file per student.",
+          );
+        }
+        for (const group of groupPagesByStudent(pageNames)) {
+          const studentId = matchNameToStudent(
+            group.name,
+            students.filter((student) => !taken.has(student.id)),
+          );
+          const sheet = {
+            fileName: `${slugify(group.name || "sheet")}-p${group.first}.pdf`,
+            mimeType: mime,
+            content: await extractPdfPages(content, group.first, group.last),
+            pageFrom: group.first,
+            pageTo: group.last,
+          };
+          if (studentId) {
+            taken.add(studentId);
+            prepared.push({
+              studentId,
+              sheet,
+              byAi: true,
+            });
+          } else {
+            unmatched.push(`pages ${group.first}-${group.last}`);
+          }
+        }
+        continue;
+      }
+      const studentId = matchByFilename(name, students, taken);
+      const sheet = {
+        fileName: name,
+        mimeType: mime,
+        content,
+      };
+      if (studentId) {
+        taken.add(studentId);
+        prepared.push({
+          studentId,
+          sheet,
+          byAi: false,
+        });
+      } else {
+        pendingAiMatch.push({ sheet, pages });
+      }
+    }
+
+  // Filename told us nothing (IMG_4821.jpg, ag.png) — read the name off the
+  // sheet itself, the same way whole-class PDFs are split. Reads run in
+  // parallel; assignment stays sequential so two sheets cannot land on one
+  // student. Bounded so a huge unnamed batch cannot fan out into a model call
+  // per file.
+  if (pendingAiMatch.length) {
+    const attempts = pendingAiMatch.slice(0, MAX_AI_MATCHES);
+    const overflow = pendingAiMatch.slice(MAX_AI_MATCHES);
+    const readings = await Promise.all(
+      attempts.map(async ({ sheet, pages }) => {
+        try {
+          const names = await identifyPages(sheet.content, sheet.mimeType, pages);
+          return names.find((value) => value) ?? null;
+        } catch (error) {
+          console.error(`Could not read a name off ${sheet.fileName}:`, error);
+          return null;
+        }
+      }),
+    );
+    attempts.forEach(({ sheet }, index) => {
+      const studentId = matchNameToStudent(
+        readings[index],
+        students.filter((student) => !taken.has(student.id)),
+      );
+      if (studentId) {
+        taken.add(studentId);
+        prepared.push({ studentId, sheet, byAi: true });
+      } else {
+        unmatched.push(sheet.fileName);
+      }
+    });
+    overflow.forEach(({ sheet }) => unmatched.push(sheet.fileName));
   }
   // A re-upload under a different filename lands on a different storage path;
   // without this, the old object stays in the bucket forever.
@@ -220,3 +284,6 @@ async function presentStudents(testId, classroomId) {
   const away = new Set(absent.map((row) => row.student_id));
   return students.filter((student) => !away.has(student.id));
 }
+
+// Splitting a class PDF reads every page in one model call.
+export const maxDuration = 60;
