@@ -43,6 +43,7 @@ import { ResultSheet } from "@/components/app/result-sheet";
 import { TestStatusBadge } from "@/components/app/test-bits";
 import {
   gradeTest,
+  clearSubmissions,
   removeSubmission,
   removeTest,
   setAttendance,
@@ -199,6 +200,25 @@ export default function TestWorkspacePage() {
       setUploading(false);
     }
   }
+  async function clearSheets() {
+    if (!test) return;
+    const ok = await confirm({
+      title: "Remove all uploaded sheets?",
+      body: `Every answer sheet and mark on this test is removed from the server — ${pluralize(
+        submissions.length,
+        "sheet",
+      )} in all. Students and attendance stay.`,
+      confirmLabel: "Remove all",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await clearSubmissions(test.id);
+      toast("All sheets removed", "success");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not remove the sheets", "error");
+    }
+  }
   async function remove() {
     if (!test || !classroom) return;
     const ok = await confirm({
@@ -319,6 +339,18 @@ export default function TestWorkspacePage() {
                 >
                   Mark all present
                 </MenuItem>
+                {submissions.length > 0 ? (
+                  <MenuItem
+                    danger
+                    icon={<IconTrash size={14} />}
+                    onClick={() => {
+                      close();
+                      void clearSheets();
+                    }}
+                  >
+                    Remove all sheets
+                  </MenuItem>
+                ) : null}
                 <MenuSeparator />
                 <MenuItem
                   danger
@@ -735,10 +767,59 @@ function ResultCell({ submission, absent, graded, percent, maxMarks, onGrade }) 
 function AnswerCell({ student, submission, absent, testId, canUpload, onUpload }) {
   const inputRef = useRef(null);
   const toast = useToast();
+  const confirm = useConfirm();
   if (absent) return <span className="text-[12.5px] text-ink-4">No sheet expected</span>;
+  // Wrong paper on the wrong student happens — any sheet that is not mid-grade
+  // can be replaced or removed, marked or not. Replacing goes through the same
+  // upload path, which wipes the old file and the old mark.
+  const settled =
+    submission &&
+    (submission.status === "awaiting" ||
+      submission.status === "failed" ||
+      submission.status === "graded");
+  const picker = (
+    <input
+      ref={inputRef}
+      type="file"
+      accept="image/*,application/pdf"
+      className="hidden"
+      aria-label={`Upload an answer sheet for ${student.name}`}
+      onChange={async (event) => {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+        if (!file) return;
+        // Replacing a marked sheet destroys its mark — say so first.
+        if (submission?.status === "graded") {
+          const ok = await confirm({
+            title: `Replace ${student.name}'s sheet?`,
+            body: "The current sheet and its mark are removed from the server. The new upload starts unmarked.",
+            confirmLabel: "Replace sheet",
+            danger: true,
+          });
+          if (!ok) return;
+        }
+        onUpload([file]);
+      }}
+    />
+  );
+  async function removeSheet() {
+    if (submission.status === "graded") {
+      const ok = await confirm({
+        title: `Remove ${student.name}'s sheet?`,
+        body: "The sheet and its mark are removed from the server. Upload another to mark them again.",
+        confirmLabel: "Remove sheet",
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    await removeSubmission(testId, submission.id).catch(() =>
+      toast("Could not remove that sheet", "error"),
+    );
+  }
   if (submission) {
     return (
       <span className="flex min-w-0 items-center gap-1.5">
+        {picker}
         <IconFile size={13} className="shrink-0 text-ink-4" />
         <span className="truncate font-mono text-[11.5px] text-ink-3">
           {submission.file_name ?? "answer"}
@@ -751,36 +832,32 @@ function AnswerCell({ student, submission, absent, testId, canUpload, onUpload }
             <IconSparkle size={11} />
           </span>
         ) : null}
-        {submission.status === "awaiting" ? (
-          <button
-            aria-label="Remove this answer sheet"
-            onClick={() =>
-              void removeSubmission(testId, submission.id).catch(() =>
-                toast("Could not remove that sheet", "error"),
-              )
-            }
-            className="shrink-0 text-ink-4 transition-opacity hover:text-danger sm:opacity-0 sm:focus-visible:opacity-100 sm:group-hover/row:opacity-100"
-          >
-            <IconX size={12} />
-          </button>
+        {settled ? (
+          <>
+            <button
+              aria-label={`Replace ${student.name}'s answer sheet`}
+              title="Upload a different sheet in its place"
+              onClick={() => inputRef.current?.click()}
+              className="shrink-0 text-ink-4 transition-opacity hover:text-accent sm:opacity-0 sm:focus-visible:opacity-100 sm:group-hover/row:opacity-100"
+            >
+              <IconUpload size={12} />
+            </button>
+            <button
+              aria-label={`Remove ${student.name}'s answer sheet`}
+              title="Remove this sheet"
+              onClick={() => void removeSheet()}
+              className="shrink-0 text-ink-4 transition-opacity hover:text-danger sm:opacity-0 sm:focus-visible:opacity-100 sm:group-hover/row:opacity-100"
+            >
+              <IconX size={12} />
+            </button>
+          </>
         ) : null}
       </span>
     );
   }
   return (
     <>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*,application/pdf"
-        className="hidden"
-        aria-label={`Upload an answer sheet for ${student.name}`}
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) onUpload([file]);
-          event.target.value = "";
-        }}
-      />
+      {picker}
       <button
         onClick={() => inputRef.current?.click()}
         disabled={!canUpload}

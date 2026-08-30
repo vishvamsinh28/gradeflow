@@ -105,8 +105,14 @@ Class 10-A
   answer sheet and never drags down an average.
 - **Subjects are just names.** They live inline on the classroom overview rather than
   getting a page of their own.
-- **Grading starts by itself** once answers are uploaded. Progress is shown per student,
-  and it keeps running if the teacher navigates away.
+- **Grading waits for the teacher.** Uploading only collects sheets; the Grade button
+  starts marking — everything pending, or just the students ticked in the roster.
+  Progress is shown per student, and a started batch keeps running if the teacher
+  navigates away.
+- **Any sheet can be replaced or removed** from its row, marked or not — the wrong
+  paper on the wrong student is a two-click fix, and the test menu can clear every
+  uploaded sheet at once. Replacing or removing a marked sheet asks first, because
+  the mark goes with it.
 
 ## Screens
 

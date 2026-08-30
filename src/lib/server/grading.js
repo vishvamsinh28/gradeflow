@@ -116,11 +116,13 @@ export async function settleTest(testId) {
     _count: true,
   });
   const of = (status) => counts.find((row) => row.status === status)?._count ?? 0;
+  const total = counts.reduce((sum, row) => sum + row._count, 0);
   const inFlight = of("queued") + of("grading");
   const unfinished = of("awaiting") + of("failed");
   // Mid-batch the test is still grading; "collecting" while jobs are running
-  // read as the batch having silently stopped.
-  const status = inFlight ? "grading" : unfinished ? "collecting" : "graded";
+  // read as the batch having silently stopped. No sheets at all — every upload
+  // removed, say — is back to collecting, not "graded with nothing in it".
+  const status = inFlight ? "grading" : unfinished || total === 0 ? "collecting" : "graded";
   await db.tests.update({
     where: { id: testId },
     data: { status, updated_at: new Date() },

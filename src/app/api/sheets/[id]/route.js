@@ -51,5 +51,7 @@ export const DELETE = route(async (request, { params }) => {
     },
   });
   await deleteSheets([submission.storage_path]);
+  // A graded test that just lost a sheet is no longer graded.
+  await settleTest(submission.test_id);
   return noContent();
 });

@@ -373,6 +373,11 @@ export async function removeSubmission(testId, submissionId) {
   await api.deleteSubmission(submissionId);
   await refreshTest(testId);
 }
+/** Remove every uploaded sheet on the test — a wrong stack, cleared in one go. */
+export async function clearSubmissions(testId) {
+  await api.clearSubmissions(testId);
+  await refreshTest(testId);
+}
 export async function reviewSubmission(testId, submissionId, input) {
   const updated = await api.reviewSubmission(submissionId, input);
   const workspace = cache.byId[testId];

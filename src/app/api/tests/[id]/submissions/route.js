@@ -1,6 +1,6 @@
 import { db } from "@/lib/server/db";
 import { requireUser } from "@/lib/server/auth";
-import { ApiError, json, route } from "@/lib/server/http";
+import { ApiError, json, noContent, route } from "@/lib/server/http";
 import { ownedTest, submissionPayload } from "@/lib/server/domain";
 import { identifyPages } from "@/lib/server/grader";
 import {
@@ -10,6 +10,7 @@ import {
   matchNameToStudent,
   pdfPageCount,
 } from "@/lib/server/sheets";
+import { settleTest } from "@/lib/server/grading";
 import { slugify } from "@/lib/server/shape";
 import {
   MAX_FILES,
@@ -230,6 +231,10 @@ export const POST = route(async (request, { params }) => {
     );
   }
   await deleteSheets(replaced);
+  // A fresh sheet un-grades the test: replacing a marked paper on a "graded"
+  // test must pull its status back to collecting, not leave a green badge over
+  // an unmarked upload.
+  if (created.length) await settleTest(id);
 
   // Unmatched sheets are reported, never guessed at. Attaching one student's
   // paper to another is the worst mistake this product could make, so the
@@ -275,3 +280,25 @@ async function presentStudents(testId, classroomId) {
 
 // Splitting a class PDF reads every page in one model call.
 export const maxDuration = 60;
+
+/**
+ * Remove every uploaded sheet on the test — rows, marks and stored files.
+ *
+ * The wrong stack of papers happens: a different class's scans, last week's
+ * test. One action clears the slate so the right ones can be uploaded, instead
+ * of removing thirty sheets row by row. Students and attendance stay.
+ */
+export const DELETE = route(async (request, { params }) => {
+  const user = await requireUser(request);
+  const { id } = await params;
+  await ownedTest(id, user.id);
+  const sheets = await db.test_submissions.findMany({
+    where: { test_id: id },
+    select: { storage_path: true },
+  });
+  if (!sheets.length) return noContent();
+  await db.test_submissions.deleteMany({ where: { test_id: id } });
+  await deleteSheets(sheets.map((sheet) => sheet.storage_path));
+  await settleTest(id);
+  return noContent();
+});

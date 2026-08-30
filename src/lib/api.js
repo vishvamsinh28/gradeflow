@@ -230,6 +230,10 @@ export const deleteSubmission = (id) =>
   request(`/sheets/${id}`, {
     method: "DELETE",
   });
+export const clearSubmissions = (testId) =>
+  request(`/tests/${testId}/submissions`, {
+    method: "DELETE",
+  });
 export const gradeTest = (testId, submissionIds) =>
   request(`/tests/${testId}/grade`, {
     method: "POST",
