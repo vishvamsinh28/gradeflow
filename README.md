@@ -65,7 +65,8 @@ annotated list. The ones that need explaining:
 - **Sheets sit "Queued" after everyone closes the tab** — the sweeper cron is
   not set up. Point cron-job.org at `POST /api/queue/drain` with the
   `X-Drain-Secret` header; the browser finishes them on the next visit either
-  way.
+  way. Sheets that merely say "Ready to grade" are not stuck — nothing grades
+  until the Grade button asks for it.
 - **`MODULE_NOT_FOUND` from Next, or a dev server that hangs** — two Next
   processes are sharing one `.next` directory. Never run `next build` while
   `next dev` is running; give the build its own output directory instead:
@@ -265,22 +266,24 @@ those in automatically.
 
 ### Grading
 
-Marking a class is too slow for one request, so the submission rows themselves
-are the queue. A sheet with a file is `awaiting`; grading claims a small batch
-(flipping it to `queued`, then `grading`), marks each with one model call, and
-reports how many are left. Three things drive that loop, all through the same
-claim, so they never fight over a sheet:
+Nothing is marked until the teacher asks: uploading only files sheets away as
+`awaiting`. Marking a class is too slow for one request, so the submission rows
+themselves are the queue. When the teacher clicks Grade, a claim flips the
+chosen sheets to `queued` (then `grading`), marks each with one model call, and
+reports how many are left. Two things drive that loop, through the same claim,
+so they never fight over a sheet:
 
-- **Uploading** grades the first batch in the background of its own request.
-- **The Grade button** (or a row's Grade/Retry) calls `POST /tests/:id/grade`
-  repeatedly until `remaining` hits zero — progress lands on screen batch by
-  batch. A body of `{"submission_ids": [...]}` scopes it to chosen students.
-- **A sweeper** — cron-job.org POSTs `/api/queue/drain` every few minutes so
-  sheets left behind by a closed tab still finish. It has no session; it
-  authenticates with the `X-Drain-Secret` header, and a claim stuck in
-  `grading` for ten minutes is considered abandoned and picked up again.
+- **The Grade button** calls `POST /tests/:id/grade` repeatedly until
+  `remaining` hits zero — progress lands on screen batch by batch. With rows
+  ticked (or a row's own Grade/Retry) it sends `{"submission_ids": [...]}` and
+  marks just those students; with nothing ticked it takes everything pending.
+- **A sweeper** — cron-job.org POSTs `/api/queue/drain` every few minutes to
+  finish batches a teacher started and left (tab closed mid-grading). It only
+  ever touches `queued` sheets and claims stuck in `grading` for ten minutes;
+  `awaiting` sheets are never started by it, so nothing grades unasked. It has
+  no session; it authenticates with the `X-Drain-Secret` header.
 
-`failed` sheets are never swept — retrying those is the teacher's call.
+`failed` sheets are never swept either — retrying those is the teacher's call.
 
 ### Production notes
 

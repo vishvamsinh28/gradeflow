@@ -195,10 +195,13 @@ export async function gradeBatch(jobs) {
 }
 
 /**
- * The sweeper's claim: oldest pending sheets across every test and teacher.
+ * The sweeper's claim: sheets a teacher already sent to grading, left behind
+ * when their tab closed mid-batch.
  *
- * `failed` is deliberately excluded — a sheet the model could not read twice
- * should wait for a human, not burn a model call every sweep forever.
+ * `awaiting` is deliberately excluded — uploading is not a request to grade;
+ * nothing is marked until the teacher clicks Grade. `failed` too — a sheet the
+ * model could not read should wait for a human, not burn a model call every
+ * sweep forever.
  */
 export async function claimGlobalPending(limit) {
   const staleBefore = new Date(Date.now() - 10 * 60 * 1000);
@@ -206,7 +209,7 @@ export async function claimGlobalPending(limit) {
     where: {
       storage_path: { not: null },
       OR: [
-        { status: { in: ["awaiting", "queued"] } },
+        { status: "queued" },
         { status: "grading", updated_at: { lt: staleBefore } },
       ],
     },

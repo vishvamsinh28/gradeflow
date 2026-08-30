@@ -76,6 +76,10 @@ export default function TestWorkspacePage() {
   const [uploading, setUploading] = useState(false);
   const [outcome, setOutcome] = useState(null);
   const [openResultId, setOpenResultId] = useState(null);
+  // Sheets ticked for grading, by submission id. Derived against the live rows
+  // on every render, so a sheet that grades (or is deleted) drops out on its
+  // own instead of lingering in a stale selection.
+  const [picked, setPicked] = useState(() => new Set());
   const test = workspace?.test;
   const students = useMemo(() => workspace?.students ?? [], [workspace]);
   const submissions = useMemo(() => workspace?.submissions ?? [], [workspace]);
@@ -155,9 +159,18 @@ export default function TestWorkspacePage() {
     (row) => row.submission?.status === "awaiting" || row.submission?.status === "failed",
   ).length;
   const gradedCount = rows.filter((row) => row.submission?.status === "graded").length;
-  const busy =
-    test.status === "grading" ||
-    submissions.some((item) => item.status === "queued" || item.status === "grading");
+  const selectableIds = rows
+    .filter(
+      (row) =>
+        !row.absent &&
+        (row.submission?.status === "awaiting" || row.submission?.status === "failed"),
+    )
+    .map((row) => row.submission.id);
+  const selected = selectableIds.filter((id) => picked.has(id));
+  const inFlight = submissions.filter(
+    (item) => item.status === "queued" || item.status === "grading",
+  ).length;
+  const busy = test.status === "grading" || inFlight > 0;
   const counts = {
     all: rows.length,
     awaiting: rows.filter((row) => !row.absent && !row.submission).length,
@@ -176,7 +189,7 @@ export default function TestWorkspacePage() {
       const count = result.submissions.length;
       toast(
         count > 0
-          ? `${pluralize(count, "sheet")} uploaded — grading now`
+          ? `${pluralize(count, "sheet")} uploaded — ready to grade`
           : "No sheets could be matched to a student",
         count > 0 ? "success" : "error",
       );
@@ -249,11 +262,21 @@ export default function TestWorkspacePage() {
             loading={busy}
             disabled={ungraded === 0 || busy}
             icon={busy ? undefined : <IconSparkle size={14} />}
-            onClick={() =>
-              void gradeTest(test.id).catch(() => toast("Grading stopped — try again", "error"))
-            }
+            onClick={() => {
+              const scope = selected.length > 0 ? [...selected] : undefined;
+              setPicked(new Set());
+              void gradeTest(test.id, scope).catch(() =>
+                toast("Grading stopped — try again", "error"),
+              );
+            }}
           >
-            {busy ? "Grading…" : ungraded > 0 ? `Grade ${ungraded}` : "Nothing to grade"}
+            {busy
+              ? "Grading…"
+              : selected.length > 0
+                ? `Grade ${selected.length} selected`
+                : ungraded > 0
+                  ? `Grade all ${ungraded}`
+                  : "Nothing to grade"}
           </Button>
           <Menu
             trigger={({ open, toggle }) => (
@@ -378,7 +401,9 @@ export default function TestWorkspacePage() {
             <p className="flex items-center gap-2 text-[13px] font-medium text-accent">
               {busy ? <Spinner size={13} /> : <IconSparkle size={13} />}
               {busy
-                ? `Grading ${progress.submitted} submissions…`
+                ? inFlight > 0
+                  ? `Grading ${pluralize(inFlight, "sheet")} of ${progress.submitted}…`
+                  : "Grading…"
                 : `${progress.submitted - progress.graded} waiting to be graded`}
             </p>
             <span className="font-mono text-[12.5px] text-accent tnum">
@@ -418,6 +443,20 @@ export default function TestWorkspacePage() {
             </span>
           </button>
         ))}
+        {selectableIds.length > 1 ? (
+          <button
+            onClick={() =>
+              setPicked(
+                selected.length === selectableIds.length ? new Set() : new Set(selectableIds),
+              )
+            }
+            className="ml-auto text-[12.5px] font-medium text-ink-3 transition-colors hover:text-accent"
+          >
+            {selected.length === selectableIds.length
+              ? "Clear selection"
+              : `Select all ${selectableIds.length}`}
+          </button>
+        ) : null}
       </div>
 
       <div className="mt-2.5 overflow-hidden rounded-xl border border-line bg-surface">
@@ -453,6 +492,19 @@ export default function TestWorkspacePage() {
                   void gradeTest(test.id, [submissionId]).catch(() =>
                     toast("Could not grade that sheet", "error"),
                   )
+                }
+                showSelect={selectableIds.length > 0}
+                selectable={
+                  !absent && (submission?.status === "awaiting" || submission?.status === "failed")
+                }
+                selected={submission ? picked.has(submission.id) : false}
+                onToggle={() =>
+                  setPicked((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(submission.id)) next.delete(submission.id);
+                    else next.add(submission.id);
+                    return next;
+                  })
                 }
               />
             ))}
@@ -523,6 +575,10 @@ function RosterRow({
   onUpload,
   canUpload,
   onGrade,
+  showSelect,
+  selectable,
+  selected,
+  onToggle,
 }) {
   const graded = submission?.status === "graded";
   const percent =
@@ -550,6 +606,23 @@ function RosterRow({
       onClick={graded ? onOpen : undefined}
     >
       <div className="flex items-center gap-3">
+        {showSelect ? (
+          <span
+            className="flex w-4 shrink-0 items-center justify-center"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {selectable ? (
+              <input
+                type="checkbox"
+                checked={selected}
+                onChange={onToggle}
+                aria-label={`Pick ${student.name} for grading`}
+                className="h-3.5 w-3.5 cursor-pointer"
+                style={{ accentColor: "var(--accent)" }}
+              />
+            ) : null}
+          </span>
+        ) : null}
         <Avatar name={student.name} size={26} />
         <div className="min-w-0 flex-[1.4]">
           <p

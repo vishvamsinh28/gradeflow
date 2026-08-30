@@ -3,8 +3,6 @@ import { requireUser } from "@/lib/server/auth";
 import { ApiError, json, route } from "@/lib/server/http";
 import { ownedTest, submissionPayload } from "@/lib/server/domain";
 import { identifyPages } from "@/lib/server/grader";
-import { after } from "next/server";
-import { GRADE_BATCH, claimPendingSheets, gradeBatch } from "@/lib/server/grading";
 import {
   extractPdfPages,
   groupPagesByStudent,
@@ -232,14 +230,6 @@ export const POST = route(async (request, { params }) => {
     );
   }
   await deleteSheets(replaced);
-  if (created.length) {
-    // Grading starts by itself: one batch runs after this response goes out,
-    // and anything beyond it is drained by the page's loop or the sweeper.
-    after(async () => {
-      const jobs = await claimPendingSheets(id);
-      await gradeBatch(jobs.slice(0, GRADE_BATCH));
-    });
-  }
 
   // Unmatched sheets are reported, never guessed at. Attaching one student's
   // paper to another is the worst mistake this product could make, so the
