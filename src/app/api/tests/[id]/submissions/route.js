@@ -3,7 +3,8 @@ import { requireUser } from "@/lib/server/auth";
 import { ApiError, json, route } from "@/lib/server/http";
 import { ownedTest, submissionPayload } from "@/lib/server/domain";
 import { identifyPages } from "@/lib/server/grader";
-import { gradeRequested, inngest } from "@/lib/server/inngest/client";
+import { after } from "next/server";
+import { GRADE_BATCH, claimPendingSheets, gradeBatch } from "@/lib/server/grading";
 import {
   extractPdfPages,
   groupPagesByStudent,
@@ -232,15 +233,12 @@ export const POST = route(async (request, { params }) => {
   }
   await deleteSheets(replaced);
   if (created.length) {
-    // The sheets are stored and the rows written — the upload has succeeded.
-    // If the queue is unreachable the rows simply stay `awaiting`, and the
-    // Grade button re-queues them; failing the whole request here would tell
-    // the teacher their upload was lost when it was not.
-    try {
-      await inngest.send(gradeRequested.create({ testId: id }));
-    } catch (error) {
-      console.error("Could not queue grading after upload:", error);
-    }
+    // Grading starts by itself: one batch runs after this response goes out,
+    // and anything beyond it is drained by the page's loop or the sweeper.
+    after(async () => {
+      const jobs = await claimPendingSheets(id);
+      await gradeBatch(jobs.slice(0, GRADE_BATCH));
+    });
   }
 
   // Unmatched sheets are reported, never guessed at. Attaching one student's

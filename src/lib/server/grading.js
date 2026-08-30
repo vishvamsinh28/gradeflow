@@ -132,12 +132,15 @@ export async function settleTest(testId) {
  *
  * Claiming up front means a second click cannot double-queue the same sheet.
  */
-export async function claimPendingSheets(testId) {
+export async function claimPendingSheets(testId, submissionIds) {
   const staleBefore = new Date(Date.now() - 10 * 60 * 1000);
   const pending = await db.test_submissions.findMany({
     where: {
       test_id: testId,
       storage_path: { not: null },
+      // The teacher can point at specific sheets — grade these one or two, not
+      // the whole class.
+      ...(submissionIds?.length ? { id: { in: submissionIds } } : {}),
       OR: [
         { status: { in: ["awaiting", "failed", "queued"] } },
         // A row can be stranded mid-"grading" by a crash between the attempt
@@ -174,4 +177,55 @@ export async function claimPendingSheets(testId) {
   return pending.map((row) => ({
     submissionId: row.id,
   }));
+}
+
+/** How many sheets fit in one invocation with room to spare. */
+export const GRADE_BATCH = 3;
+
+/** Grade a set of claimed jobs; a failure marks that sheet, never stops the rest. */
+export async function gradeBatch(jobs) {
+  for (const job of jobs) {
+    try {
+      await gradeOne(job);
+    } catch (error) {
+      console.error("Grading failed for", job.submissionId, error);
+      await markSheetFailed(job.submissionId);
+    }
+  }
+}
+
+/**
+ * The sweeper's claim: oldest pending sheets across every test and teacher.
+ *
+ * `failed` is deliberately excluded — a sheet the model could not read twice
+ * should wait for a human, not burn a model call every sweep forever.
+ */
+export async function claimGlobalPending(limit) {
+  const staleBefore = new Date(Date.now() - 10 * 60 * 1000);
+  const pending = await db.test_submissions.findMany({
+    where: {
+      storage_path: { not: null },
+      OR: [
+        { status: { in: ["awaiting", "queued"] } },
+        { status: "grading", updated_at: { lt: staleBefore } },
+      ],
+    },
+    orderBy: { updated_at: "asc" },
+    take: limit,
+    select: { id: true, test_id: true },
+  });
+  if (!pending.length) return [];
+
+  const testIds = [...new Set(pending.map((row) => row.test_id))];
+  await db.$transaction([
+    db.test_submissions.updateMany({
+      where: { id: { in: pending.map((row) => row.id) } },
+      data: { status: "queued", updated_at: new Date() },
+    }),
+    db.tests.updateMany({
+      where: { id: { in: testIds } },
+      data: { status: "grading", updated_at: new Date() },
+    }),
+  ]);
+  return pending.map((row) => ({ submissionId: row.id }));
 }

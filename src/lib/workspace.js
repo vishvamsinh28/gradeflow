@@ -55,7 +55,9 @@ function useCache() {
  */
 function useGuardedLoad(reload, outcomeVisible, shouldRun = true) {
   const outcomeRef = useRef(outcomeVisible);
-  outcomeRef.current = outcomeVisible;
+  useEffect(() => {
+    outcomeRef.current = outcomeVisible;
+  });
   const [, forceRender] = useState(0);
   useEffect(() => {
     if (!shouldRun) return;
@@ -392,11 +394,15 @@ export async function saveQuestions(testId, questions) {
   await refreshTest(testId);
 }
 
-export async function gradeTest(testId) {
-  await api.gradeTest(testId);
+/**
+ * Drive grading to the end, one batch per request.
+ *
+ * There is no queue: each call marks up to a few sheets and reports what is
+ * left, and this loop simply keeps going until nothing is. Pass submission ids
+ * to grade only those — one student's sheet, or a handful.
+ */
+export async function gradeTest(testId, submissionIds) {
   const cached = cache.byId[testId];
-  // The poll picks the status up regardless; this only avoids a flash of the
-  // old badge when the test is already on screen.
   if (cached)
     patchTest(testId, {
       test: {
@@ -404,10 +410,21 @@ export async function gradeTest(testId) {
         status: "grading",
       },
     });
+  let guard = 0;
+  let result;
+  do {
+    result = await api.gradeTest(testId, submissionIds);
+    await refreshTest(testId);
+    guard += 1;
+  } while (result.remaining > 0 && guard < 80);
+  return result;
 }
 export async function regradeTest(testId, correction, onlyFlagged = false) {
   const result = await api.regradeTest(testId, correction, onlyFlagged);
   await refreshTest(testId);
+  // The correction is stored on the test; the plain grading loop finishes the
+  // remaining sheets with it.
+  if (result.remaining > 0) await gradeTest(testId);
   return result;
 }
 

@@ -230,9 +230,10 @@ export const deleteSubmission = (id) =>
   request(`/sheets/${id}`, {
     method: "DELETE",
   });
-export const gradeTest = (testId) =>
+export const gradeTest = (testId, submissionIds) =>
   request(`/tests/${testId}/grade`, {
     method: "POST",
+    body: JSON.stringify(submissionIds?.length ? { submission_ids: submissionIds } : {}),
   });
 export const regradeTest = (testId, correction, onlyFlagged = false) =>
   request(`/tests/${testId}/regrade`, {

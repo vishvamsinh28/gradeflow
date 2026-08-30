@@ -28,13 +28,6 @@ npm run dev
 
 Open <http://localhost:3000> and create an account on `/signup`.
 
-To watch grading run locally, start Inngest's dev server alongside it — it finds
-the app on its own:
-
-```bash
-npx inngest-cli@latest dev
-```
-
 ### Everyday commands
 
 | Command | What it does |
@@ -55,8 +48,9 @@ annotated list. The ones that need explaining:
   pgbouncer is what stops that exhausting Postgres. `DIRECT_URL` stays direct;
   Prisma uses it for schema changes only.
 - **`JWT_SECRET`** — 32 characters or more. Changing it signs everyone out.
-- **`INNGEST_*`** — the grading queue. Not needed locally, where the Inngest dev
-  server handles it. Set both in production from app.inngest.com.
+- **`DRAIN_SECRET`** — authenticates the grading sweeper (see
+  [Grading](#grading)). Optional: without it grading still runs whenever the
+  test page is open, sheets just wait when nobody has it open.
 
 ### If something goes wrong
 
@@ -68,8 +62,10 @@ annotated list. The ones that need explaining:
   free tier, also check the project has not been paused for inactivity.
 - **Sign-in works but nothing loads** — `DATABASE_URL` points somewhere without
   the schema. Run `npm run db:push`.
-- **Grading never starts** — no Inngest dev server locally, or the production
-  keys are missing. `/api/inngest` is the endpoint it registers.
+- **Sheets sit "Queued" after everyone closes the tab** — the sweeper cron is
+  not set up. Point cron-job.org at `POST /api/queue/drain` with the
+  `X-Drain-Secret` header; the browser finishes them on the next visit either
+  way.
 - **`MODULE_NOT_FOUND` from Next, or a dev server that hangs** — two Next
   processes are sharing one `.next` directory. Never run `next build` while
   `next dev` is running; give the build its own output directory instead:
@@ -186,7 +182,7 @@ src/
       tests/[id]/…                questions, attendance, uploads, grade, regrade
       sheets/[id]/…               review a mark, fetch the paper
       share/[token]/              unauthenticated, whitelisted results
-      inngest/                    the grading queue's endpoint
+      queue/drain/                the sweeper's endpoint, cron-called
   components/
     ui/                           Design-system primitives
     app/                          Workspace components
@@ -201,7 +197,6 @@ src/
       auth.js  storage.js         Sessions; the private answer-sheet bucket
       grader.js  grading.js       Gemini calls; what marking one sheet means
       rate-limit.js               Fixed-window limits, backed by Postgres
-      inngest/                    Queue client and functions
   proxy.js                        Origin check on every mutating /api request
 prisma/schema.prisma              The database
 ```
@@ -270,22 +265,31 @@ those in automatically.
 
 ### Grading
 
-Marking a class is too slow for one request, and a serverless function dies with
-its request, so grading runs on Inngest: `test/grade.requested` claims the
-pending sheets and fans out one `test/sheet.grade` per paper. Each job is a
-single model call, retried on its own, capped at five at a time so a big class
-cannot open thirty at once.
+Marking a class is too slow for one request, so the submission rows themselves
+are the queue. A sheet with a file is `awaiting`; grading claims a small batch
+(flipping it to `queued`, then `grading`), marks each with one model call, and
+reports how many are left. Three things drive that loop, all through the same
+claim, so they never fight over a sheet:
 
-`/api/inngest` is the endpoint. It has no session — Inngest calls it — and
-authenticates with a signing key instead.
+- **Uploading** grades the first batch in the background of its own request.
+- **The Grade button** (or a row's Grade/Retry) calls `POST /tests/:id/grade`
+  repeatedly until `remaining` hits zero — progress lands on screen batch by
+  batch. A body of `{"submission_ids": [...]}` scopes it to chosen students.
+- **A sweeper** — cron-job.org POSTs `/api/queue/drain` every few minutes so
+  sheets left behind by a closed tab still finish. It has no session; it
+  authenticates with the `X-Drain-Secret` header, and a claim stuck in
+  `grading` for ten minutes is considered abandoned and picked up again.
+
+`failed` sheets are never swept — retrying those is the teacher's call.
 
 ### Production notes
 
 - Deploy to Vercel; the whole app is one project. `npm run build` runs
   `prisma generate` first.
 - Use Supabase's Transaction pooler for `DATABASE_URL`.
-- Connect the Inngest app and set `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY`,
-  or nothing will ever be marked.
+- Set `DRAIN_SECRET` and create the cron-job.org job (`POST
+  <site>/api/queue/drain`, `X-Drain-Secret` header, every 5 minutes) so
+  grading finishes even after the teacher closes the tab.
 - Answer sheets have no retention policy yet; they stay in the bucket until the
   classroom, test or student that owns them is deleted.
 - Add malware scanning and stricter file validation before processing uploads.

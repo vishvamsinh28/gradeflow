@@ -249,7 +249,9 @@ export default function TestWorkspacePage() {
             loading={busy}
             disabled={ungraded === 0 || busy}
             icon={busy ? undefined : <IconSparkle size={14} />}
-            onClick={() => void gradeTest(test.id).then(reload)}
+            onClick={() =>
+              void gradeTest(test.id).catch(() => toast("Grading stopped — try again", "error"))
+            }
           >
             {busy ? "Grading…" : ungraded > 0 ? `Grade ${ungraded}` : "Nothing to grade"}
           </Button>
@@ -447,6 +449,11 @@ export default function TestWorkspacePage() {
                 onOpen={() => submission?.status === "graded" && setOpenResultId(submission.id)}
                 canUpload={questions.length > 0}
                 onUpload={(files) => void upload(files, student.id)}
+                onGrade={(submissionId) =>
+                  void gradeTest(test.id, [submissionId]).catch(() =>
+                    toast("Could not grade that sheet", "error"),
+                  )
+                }
               />
             ))}
           </ul>
@@ -506,7 +513,17 @@ export default function TestWorkspacePage() {
 
 /* ---------- roster row ---------- */
 
-function RosterRow({ student, submission, absent, testId, maxMarks, onOpen, onUpload, canUpload }) {
+function RosterRow({
+  student,
+  submission,
+  absent,
+  testId,
+  maxMarks,
+  onOpen,
+  onUpload,
+  canUpload,
+  onGrade,
+}) {
   const graded = submission?.status === "graded";
   const percent =
     graded && submission.out_of ? ((submission.score ?? 0) / submission.out_of) * 100 : null;
@@ -550,13 +567,17 @@ function RosterRow({ student, submission, absent, testId, maxMarks, onOpen, onUp
           {controls}
         </div>
 
-        <div className="flex w-[104px] shrink-0 items-center justify-end gap-2">
+        <div
+          className="flex w-[104px] shrink-0 items-center justify-end gap-2"
+          onClick={(event) => event.stopPropagation()}
+        >
           <ResultCell
             submission={submission}
             absent={absent}
             graded={graded}
             percent={percent}
             maxMarks={maxMarks}
+            onGrade={onGrade}
           />
         </div>
 
@@ -580,7 +601,7 @@ function RosterRow({ student, submission, absent, testId, maxMarks, onOpen, onUp
     </li>
   );
 }
-function ResultCell({ submission, absent, graded, percent, maxMarks }) {
+function ResultCell({ submission, absent, graded, percent, maxMarks, onGrade }) {
   if (absent) return <Badge tone="danger">Absent</Badge>;
   if (submission?.status === "grading") {
     return (
@@ -592,7 +613,18 @@ function ResultCell({ submission, absent, graded, percent, maxMarks }) {
   }
   if (submission?.status === "queued")
     return <span className="text-[12.5px] text-ink-4">Queued</span>;
-  if (submission?.status === "failed") return <Badge tone="danger">Failed</Badge>;
+  if (submission?.status === "failed") {
+    return (
+      <button
+        onClick={() => onGrade(submission.id)}
+        title="The model could not read this sheet — try marking it again"
+        className="inline-flex h-6 items-center gap-1 rounded-md border border-danger-line bg-danger-soft px-2 text-[12px] font-medium text-danger transition-colors hover:border-danger"
+      >
+        <IconRefresh size={11} />
+        Retry
+      </button>
+    );
+  }
   if (graded && submission) {
     return (
       <>
@@ -613,7 +645,18 @@ function ResultCell({ submission, absent, graded, percent, maxMarks }) {
       </>
     );
   }
-  if (submission) return <span className="text-[12.5px] text-ink-3">Ready</span>;
+  if (submission) {
+    return (
+      <button
+        onClick={() => onGrade(submission.id)}
+        title="Grade just this sheet"
+        className="inline-flex h-6 items-center gap-1 rounded-md border border-accent-line bg-accent-soft px-2 text-[12px] font-medium text-accent transition-colors hover:border-accent"
+      >
+        <IconSparkle size={11} />
+        Grade
+      </button>
+    );
+  }
   return <span className="text-[12.5px] text-ink-4">&mdash;</span>;
 }
 function AnswerCell({ student, submission, absent, testId, canUpload, onUpload }) {

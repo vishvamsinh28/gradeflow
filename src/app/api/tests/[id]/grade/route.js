@@ -1,49 +1,41 @@
+import { z } from "zod";
 import { requireUser } from "@/lib/server/auth";
-import { ApiError, json, route } from "@/lib/server/http";
+import { body, json, route } from "@/lib/server/http";
 import { ownedTest } from "@/lib/server/domain";
-import { claimPendingSheets, gradeOne } from "@/lib/server/grading";
-import { gradeRequested, inngest } from "@/lib/server/inngest/client";
+import { GRADE_BATCH, claimPendingSheets, gradeBatch } from "@/lib/server/grading";
+
+const gradeSchema = z.object({
+  // Name specific sheets to grade just those — one student, two, whatever.
+  // Omit to grade everything pending on the test.
+  submission_ids: z.array(z.string()).max(200).optional(),
+});
 
 /**
- * A few sheets are graded right here, in this request. The queue only exists
- * for batches too big for one invocation — and crucially, a queue that accepts
- * events but never runs them (keys set, app not synced; dev server not
- * running) fails silently, so small batches must never depend on it.
+ * Grades one batch per call and says how much is left.
+ *
+ * No queue: the browser calls this in a loop until `remaining` hits zero, and
+ * the sweeper cron drains anything left behind. Every step is a plain request
+ * that either works or fails in plain sight.
  */
-const INLINE_LIMIT = 3;
-
 export const POST = route(async (request, { params }) => {
   const user = await requireUser(request);
   const { id } = await params;
   await ownedTest(id, user.id);
 
-  const jobs = await claimPendingSheets(id);
-  if (jobs.length === 0) return json({ status: "grading" }, 202);
+  const input = request.headers.get("content-type")?.includes("json")
+    ? await body(request, gradeSchema)
+    : {};
+  const scope = input.submission_ids;
 
-  if (jobs.length <= INLINE_LIMIT) {
-    for (const job of jobs) {
-      try {
-        await gradeOne(job);
-      } catch (error) {
-        console.error("Inline grading failed for", job.submissionId, error);
-      }
-    }
-    return json({ status: "grading" }, 202);
-  }
+  const pending = await claimPendingSheets(id, scope);
+  const batch = pending.slice(0, GRADE_BATCH);
+  await gradeBatch(batch);
 
-  try {
-    // Claimed rows are `queued`; the queue's own claim picks them up.
-    await inngest.send(gradeRequested.create({ testId: id }));
-  } catch (error) {
-    console.error("Could not reach the grading queue:", error);
-    throw new ApiError(
-      503,
-      `${jobs.length} sheets need the grading queue, which is unreachable. ` +
-        "Locally, run `npx inngest-cli dev`; in production, sync the Inngest app.",
-    );
-  }
-  return json({ status: "grading" }, 202);
+  return json({
+    graded: batch.length,
+    remaining: pending.length - batch.length,
+  });
 });
 
-// Inline grading is up to three model calls back to back.
+// One batch is up to three model calls back to back.
 export const maxDuration = 60;

@@ -13,11 +13,10 @@ const schema = z.object({
   SESSION_DAYS: z.coerce.number().int().positive().default(7),
   GEMINI_API_KEY: z.string().min(1),
   GEMINI_MODEL: z.string().default("gemini-3.1-flash-lite"),
-  // Inngest reads its own keys from the environment; they are listed in
-  // .env.example but not required here, because local development runs against
-  // the Inngest dev server without any.
-  INNGEST_EVENT_KEY: z.string().optional(),
-  INNGEST_SIGNING_KEY: z.string().optional(),
+  // Authenticates the grading sweeper (an external cron hitting
+  // /api/queue/drain). Optional: without it the sweeper endpoint refuses and
+  // grading is driven entirely by the browser.
+  DRAIN_SECRET: z.string().optional(),
 });
 let cached = null;
 export function env() {

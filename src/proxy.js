@@ -7,11 +7,11 @@ import { NextResponse } from "next/server";
  * from a form or an image tag. This is the second lock: a mutation must state
  * an Origin, and it must be this site's.
  *
- * Inngest's endpoint is exempt — it is called by Inngest, not a browser, and
- * authenticates with a signing key instead.
+ * The sweeper endpoint is exempt — it is called by a cron service, not a
+ * browser, and authenticates with a shared secret instead.
  */
 const MUTATIONS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-const QUEUE_PREFIX = "/api/inngest";
+const QUEUE_PREFIX = "/api/queue/";
 export function proxy(request) {
   if (!MUTATIONS.has(request.method)) return NextResponse.next();
   if (request.nextUrl.pathname.startsWith(QUEUE_PREFIX)) return NextResponse.next();

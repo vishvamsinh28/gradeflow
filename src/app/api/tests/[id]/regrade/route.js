@@ -2,8 +2,7 @@ import { db } from "@/lib/server/db";
 import { requireUser } from "@/lib/server/auth";
 import { ApiError, body, json, route } from "@/lib/server/http";
 import { ownedTest } from "@/lib/server/domain";
-import { gradeRequested, inngest } from "@/lib/server/inngest/client";
-import { claimPendingSheets, gradeOne } from "@/lib/server/grading";
+import { GRADE_BATCH, claimPendingSheets, gradeBatch } from "@/lib/server/grading";
 import { regradeSchema } from "@/lib/server/schemas";
 
 /**
@@ -62,34 +61,17 @@ export const POST = route(async (request, { params }) => {
       },
     }),
   ]);
-  // Small re-marks run right here; only real batches go to the queue — which
-  // fails silently when configured-but-unsynced, so it is never trusted with
-  // work this request could do itself.
-  if (targets.length <= 3) {
-    const jobs = await claimPendingSheets(id);
-    for (const job of jobs) {
-      try {
-        await gradeOne({ ...job, correction });
-      } catch (inlineError) {
-        console.error("Inline re-mark failed for", job.submissionId, inlineError);
-      }
-    }
-  } else {
-    try {
-      await inngest.send(gradeRequested.create({ testId: id, correction }));
-    } catch (error) {
-      console.error("Could not reach the grading queue:", error);
-      throw new ApiError(
-        503,
-        `${targets.length} sheets need the grading queue, which is unreachable. ` +
-          "Locally, run `npx inngest-cli dev`; in production, sync the Inngest app.",
-      );
-    }
-  }
+  // The correction is already folded into the test's guidance above, so any
+  // path that grades these rows — this batch, the browser's loop, the sweeper —
+  // marks with it. One batch runs here; the rest drain like any other grading.
+  const jobs = await claimPendingSheets(id);
+  const batch = jobs.slice(0, GRADE_BATCH);
+  await gradeBatch(batch);
   return json(
     {
       status: "grading",
       count: targets.length,
+      remaining: jobs.length - batch.length,
     },
     202,
   );
