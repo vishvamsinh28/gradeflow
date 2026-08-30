@@ -7,6 +7,7 @@ import { Button, Field, Input, cx } from "@/components/ui/primitives";
 import { IconAlert, IconEye, IconEyeOff, Logo } from "@/components/ui/icons";
 import { NightPanel } from "./night-panel";
 import { useAuth } from "@/components/app/auth-provider";
+import { clearCache } from "@/lib/workspace";
 import {
   AuthError,
   signIn,
@@ -27,7 +28,10 @@ export function AuthScreen({ mode }) {
   const [busy, setBusy] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const isSignUp = mode === "signup";
-  const next = searchParams.get("next") ?? "/app";
+  // Only same-origin paths: `?next=https://evil.example` after a successful
+  // login would otherwise be followed, which is a phishing gift.
+  const requested = searchParams.get("next") ?? "";
+  const next = requested.startsWith("/") && !requested.startsWith("//") ? requested : "/app";
   async function submit(event) {
     event.preventDefault();
     setFormError(null);
@@ -58,6 +62,8 @@ export function AuthScreen({ mode }) {
             email,
             password,
           });
+      // A previous account's workspace may still be cached in this tab.
+      clearCache();
       setUser(user);
       router.replace(next);
     } catch (error) {

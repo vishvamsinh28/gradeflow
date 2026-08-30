@@ -10,9 +10,15 @@ import {
   matchByFilename,
   matchNameToStudent,
   pdfPageCount,
-  slugify,
 } from "@/lib/server/sheets";
-import { MAX_FILES, MAX_PDF_PAGES, readUpload, uploadSheet } from "@/lib/server/storage";
+import { slugify } from "@/lib/server/shape";
+import {
+  MAX_FILES,
+  MAX_PDF_PAGES,
+  deleteSheets,
+  readUpload,
+  uploadSheet,
+} from "@/lib/server/storage";
 
 /**
  * Accept whatever the scanner produced.
@@ -106,9 +112,23 @@ export const POST = route(async (request, { params }) => {
       unmatched.push(name);
     }
   }
+  // A re-upload under a different filename lands on a different storage path;
+  // without this, the old object stays in the bucket forever.
+  const previousPaths = new Map(
+    (
+      await db.test_submissions.findMany({
+        where: { test_id: id, student_id: { in: prepared.map((entry) => entry.studentId) } },
+        select: { student_id: true, storage_path: true },
+      })
+    ).map((row) => [row.student_id, row.storage_path]),
+  );
+
   const created = [];
+  const replaced = [];
   for (const { studentId, sheet, byAi } of prepared) {
     const storagePath = await uploadSheet(user.id, id, studentId, sheet);
+    const previous = previousPaths.get(studentId);
+    if (previous && previous !== storagePath) replaced.push(previous);
     const row = {
       file_name: sheet.fileName,
       storage_path: storagePath,
@@ -146,12 +166,17 @@ export const POST = route(async (request, { params }) => {
       ),
     );
   }
+  await deleteSheets(replaced);
   if (created.length) {
-    await inngest.send(
-      gradeRequested.create({
-        testId: id,
-      }),
-    );
+    // The sheets are stored and the rows written — the upload has succeeded.
+    // If the queue is unreachable the rows simply stay `awaiting`, and the
+    // Grade button re-queues them; failing the whole request here would tell
+    // the teacher their upload was lost when it was not.
+    try {
+      await inngest.send(gradeRequested.create({ testId: id }));
+    } catch (error) {
+      console.error("Could not queue grading after upload:", error);
+    }
   }
 
   // Unmatched sheets are reported, never guessed at. Attaching one student's

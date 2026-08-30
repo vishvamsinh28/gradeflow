@@ -6,18 +6,24 @@
  * page.
  */
 import { PDFDocument } from "pdf-lib";
+import { ApiError } from "./http";
+
+async function loadPdf(content) {
+  try {
+    return await PDFDocument.load(content, { ignoreEncryption: true });
+  } catch {
+    // A truncated download or a mislabeled file is the uploader's problem to
+    // hear about, not a server error.
+    throw new ApiError(422, "That PDF could not be read. Re-export or re-scan it and try again.");
+  }
+}
 export async function pdfPageCount(content) {
-  const document = await PDFDocument.load(content, {
-    ignoreEncryption: true,
-  });
-  return document.getPageCount();
+  return (await loadPdf(content)).getPageCount();
 }
 
 /** Slice an inclusive, 1-based page range into a standalone PDF. */
 export async function extractPdfPages(content, first, last) {
-  const source = await PDFDocument.load(content, {
-    ignoreEncryption: true,
-  });
+  const source = await loadPdf(content);
   const target = await PDFDocument.create();
   const total = source.getPageCount();
   const indices = [];
@@ -103,15 +109,6 @@ export function matchByFilename(fileName, students, taken) {
     }
   }
   return null;
-}
-export function slugify(value) {
-  return (
-    value
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 48) || "classroom"
-  );
 }
 function normalize(value) {
   return value

@@ -1,6 +1,6 @@
 import { db } from "@/lib/server/db";
 import { requireUser } from "@/lib/server/auth";
-import { body, json, noContent, route } from "@/lib/server/http";
+import { ApiError, body, json, noContent, route } from "@/lib/server/http";
 import { ownedTest, questionPayload, submissionPayload, testPayload } from "@/lib/server/domain";
 import { testUpdateSchema } from "@/lib/server/schemas";
 import { deleteSheets } from "@/lib/server/storage";
@@ -66,8 +66,16 @@ export const GET = route(async (request, { params }) => {
 export const PATCH = route(async (request, { params }) => {
   const user = await requireUser(request);
   const { id } = await params;
-  await ownedTest(id, user.id);
+  const { classroom } = await ownedTest(id, user.id);
   const input = await body(request, testUpdateSchema);
+  // Same boundary as on create: the subject must belong to this classroom.
+  if (input.subject_id) {
+    const subject = await db.subjects.findFirst({
+      where: { id: input.subject_id, classroom_id: classroom.id },
+      select: { id: true },
+    });
+    if (!subject) throw new ApiError(422, "That subject is not in this classroom");
+  }
   const data = {
     updated_at: new Date(),
   };

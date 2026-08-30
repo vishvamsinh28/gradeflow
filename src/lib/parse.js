@@ -2,8 +2,8 @@
  * Roster parsing.
  *
  * Teachers paste lists, drop CSVs, or hand us a photo of a register. The first
- * two are parsed here; anything unstructured goes through the AI extractor in
- * `lib/ai.ts`. Either way the teacher lands on the same review table.
+ * two are parsed here; a photo of a register goes through the AI extract
+ * endpoint instead. Either way the teacher lands on the same review table.
  */
 
 const HEADER_HINTS =

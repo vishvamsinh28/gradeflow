@@ -36,13 +36,8 @@ export const POST = route(async (request) => {
       created_at: true,
     },
   });
-  const token = await createToken(user.id, user.email);
-  await setSessionCookie(token);
-  return json(
-    {
-      user,
-      access_token: token,
-    },
-    201,
-  );
+  await setSessionCookie(await createToken(user.id, user.email));
+  // The cookie is the session. Returning the token in the body would hand an
+  // http-only credential back to page script for no caller that needs it.
+  return json({ user }, 201);
 });

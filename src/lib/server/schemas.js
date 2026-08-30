@@ -1,12 +1,12 @@
 /** Request validation. One schema per endpoint that takes a body. */
 import { z } from "zod";
 export const registerSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   full_name: z.string().min(2).max(100),
   password: z.string().min(8).max(72),
 });
 export const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   password: z.string().min(1),
 });
 const gradeBand = z.object({

@@ -8,6 +8,11 @@
  */
 import { GoogleGenAI } from "@google/genai";
 import { env } from "./env";
+// The API carries inline files in the request body, which tops out around
+// 20MB after base64. Past that the call fails opaquely, so refuse it with a
+// reason while it is still cheap to do so.
+const MODEL_MAX_BYTES = 15 * 1024 * 1024;
+
 function client() {
   return new GoogleGenAI({
     apiKey: env().GEMINI_API_KEY,
@@ -20,6 +25,9 @@ async function askForJson(prompt, file) {
     },
   ];
   if (file) {
+    if (file.content.length > MODEL_MAX_BYTES) {
+      throw new Error("That file is too large to read in one go — compress it or split it up.");
+    }
     parts.push({
       inlineData: {
         mimeType: file.mimeType,

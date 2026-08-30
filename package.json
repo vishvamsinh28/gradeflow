@@ -6,11 +6,12 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "db:push": "prisma db push",
     "db:pull": "prisma db pull",
     "db:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "format": "prettier --write ."
   },
   "engines": {
     "node": ">=20"
@@ -34,6 +35,8 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
     "dotenv": "^17.4.2",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.3",
     "prisma": "^7.10.0",
     "tailwindcss": "^4.3.3"
   }

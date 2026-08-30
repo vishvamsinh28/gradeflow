@@ -96,11 +96,9 @@ export function ResultSheet({ submission, student, test, onClose, onStep, positi
     submission?.out_of && submission.score !== null && submission.score !== undefined
       ? (submission.score / submission.out_of) * 100
       : null;
-  const changed =
-    submission?.score !== null &&
-    submission?.score !== undefined &&
-    draft !== "" &&
-    Number(draft) !== submission.score;
+  // A failed sheet has no score yet — any typed mark counts as a change so the
+  // teacher can hand-mark it.
+  const changed = Boolean(submission) && draft !== "" && Number(draft) !== submission.score;
   async function save() {
     if (!submission || draft === "") return;
     setSaving(true);

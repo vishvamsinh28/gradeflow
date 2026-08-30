@@ -1,4 +1,4 @@
-import { claimPendingSheets, gradeOne, settleTest } from "../grading";
+import { claimPendingSheets, gradeOne, markSheetFailed, settleTest } from "../grading";
 import { gradeRequested, inngest, sheetGrade } from "./client";
 
 /**
@@ -43,6 +43,10 @@ export const gradeTest = inngest.createFunction(
  *
  * `concurrency` keeps a big class from opening thirty model calls at once, and
  * `gradeOne` settles the test afterwards because jobs finish in any order.
+ *
+ * A failed attempt throws, so a Gemini blip or a storage hiccup is retried
+ * rather than recorded; only once retries are exhausted does the failure
+ * handler mark the sheet failed so the teacher sees it.
  */
 export const gradeSheet = inngest.createFunction(
   {
@@ -52,6 +56,11 @@ export const gradeSheet = inngest.createFunction(
     retries: 2,
     concurrency: {
       limit: 5,
+    },
+    onFailure: async ({ event }) => {
+      const original = event.data.event;
+      const submissionId = original?.data?.submissionId;
+      if (submissionId) await markSheetFailed(submissionId);
     },
   },
   async ({ event, step }) => {

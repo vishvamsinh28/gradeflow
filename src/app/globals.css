@@ -2,9 +2,9 @@
 
 /* Scanned for class names. Paths are relative to this file, so every source
    directory has to be listed explicitly. */
-@source "../app/**/*.{ts,tsx}";
-@source "../components/**/*.{ts,tsx}";
-@source "../lib/**/*.{ts,tsx}";
+@source "../app/**/*.{js,jsx}";
+@source "../components/**/*.{js,jsx}";
+@source "../lib/**/*.{js,jsx}";
 
 /* ============================================================
    GradeFlow design system

@@ -12,11 +12,17 @@ export const GET = route(async (request, { params }) => {
     throw new ApiError(404, "No answer sheet was stored for this student");
   }
   const content = await downloadSheet(submission.storage_path);
+  // The stored name is whatever the browser sent at upload time; quotes or
+  // control characters in a header value are how header injection starts.
+  const safeName = (submission.file_name || "sheet").replace(/[^\x20-\x7e]|["\\]/g, "_");
   return new Response(content, {
     headers: {
       "Content-Type": submission.mime_type || "application/octet-stream",
-      "Content-Disposition": `inline; filename="${submission.file_name || "sheet"}"`,
+      "Content-Disposition": `inline; filename="${safeName}"`,
+      // Cached so re-opening a sheet during review is instant, but keyed on the
+      // cookie: after a sign-out the next account must not be served this copy.
       "Cache-Control": "private, max-age=300",
+      Vary: "Cookie",
     },
   });
 });

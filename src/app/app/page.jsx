@@ -21,7 +21,7 @@ export default function DashboardPage() {
   const { newClassroom } = useWorkspaceActions();
   const { user } = useAuth();
   const firstName = user?.fullName.trim().split(/\s+/)[0] ?? "there";
-  const rooms = classrooms ?? [];
+  const rooms = useMemo(() => classrooms ?? [], [classrooms]);
   const totalStudents = rooms.reduce((sum, classroom) => sum + classroom.students.length, 0);
 
   /** Only real, actionable work lands here — never a metric for its own sake. */

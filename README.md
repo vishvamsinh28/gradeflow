@@ -62,6 +62,10 @@ annotated list. The ones that need explaining:
 
 - **`Environment is not configured`** — a variable is missing from `.env`; the
   message names it.
+- **`Can't reach database server` / a 503 about the database** — use the
+  Supabase *pooler* hostname in both database URLs, not `db.<ref>.supabase.co`.
+  The direct host is IPv6-only and unreachable from IPv4-only networks. On the
+  free tier, also check the project has not been paused for inactivity.
 - **Sign-in works but nothing loads** — `DATABASE_URL` points somewhere without
   the schema. Run `npm run db:push`.
 - **Grading never starts** — no Inngest dev server locally, or the production

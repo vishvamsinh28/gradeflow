@@ -25,8 +25,7 @@ export const POST = route(async (request) => {
   if (!user || !(await verifyPassword(input.password, user.password_hash))) {
     throw new ApiError(401, "Incorrect email or password");
   }
-  const token = await createToken(user.id, user.email);
-  await setSessionCookie(token);
+  await setSessionCookie(await createToken(user.id, user.email));
   return json({
     user: {
       id: user.id,
@@ -34,6 +33,5 @@ export const POST = route(async (request) => {
       full_name: user.full_name,
       created_at: user.created_at,
     },
-    access_token: token,
   });
 });

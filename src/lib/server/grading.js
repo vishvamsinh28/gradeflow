@@ -7,6 +7,12 @@
 import { db } from "./db";
 import { gradeSheet } from "./grader";
 import { downloadSheet } from "./storage";
+/**
+ * Mark one sheet. Throws on failure so the queue can retry it — a Gemini blip
+ * or a storage hiccup is transient, and marking the row `failed` on the first
+ * wobble would turn every transient into a permanent until a human clicked
+ * re-mark. The queue's failure handler is what records a real failure.
+ */
 export async function gradeOne({ submissionId, correction }) {
   const submission = await db.test_submissions.findUnique({
     where: {
@@ -64,21 +70,29 @@ export async function gradeOne({ submissionId, correction }) {
         updated_at: new Date(),
       },
     });
-  } catch (error) {
-    console.error(`Grading failed for submission ${submissionId}:`, error);
-    await db.test_submissions.update({
-      where: {
-        id: submissionId,
-      },
-      data: {
-        status: "failed",
-        error_message: "Could not read this answer sheet. Try re-uploading it.",
-        updated_at: new Date(),
-      },
-    });
-  } finally {
     await settleTest(submission.test_id);
+  } catch (error) {
+    console.error(`Grading attempt failed for submission ${submissionId}:`, error);
+    throw error;
   }
+}
+
+/** What the queue records once a sheet is out of retries. */
+export async function markSheetFailed(submissionId) {
+  const submission = await db.test_submissions.findUnique({
+    where: { id: submissionId },
+    select: { test_id: true, status: true },
+  });
+  if (!submission || submission.status === "graded") return;
+  await db.test_submissions.update({
+    where: { id: submissionId },
+    data: {
+      status: "failed",
+      error_message: "Could not read this answer sheet. Try re-uploading it.",
+      updated_at: new Date(),
+    },
+  });
+  await settleTest(submission.test_id);
 }
 
 /**
@@ -88,22 +102,20 @@ export async function gradeOne({ submissionId, correction }) {
  * coordinator watching the batch.
  */
 export async function settleTest(testId) {
-  const pending = await db.test_submissions.count({
-    where: {
-      test_id: testId,
-      status: {
-        not: "graded",
-      },
-    },
+  const counts = await db.test_submissions.groupBy({
+    by: ["status"],
+    where: { test_id: testId },
+    _count: true,
   });
+  const of = (status) => counts.find((row) => row.status === status)?._count ?? 0;
+  const inFlight = of("queued") + of("grading");
+  const unfinished = of("awaiting") + of("failed");
+  // Mid-batch the test is still grading; "collecting" while jobs are running
+  // read as the batch having silently stopped.
+  const status = inFlight ? "grading" : unfinished ? "collecting" : "graded";
   await db.tests.update({
-    where: {
-      id: testId,
-    },
-    data: {
-      status: pending ? "collecting" : "graded",
-      updated_at: new Date(),
-    },
+    where: { id: testId },
+    data: { status, updated_at: new Date() },
   });
 }
 
@@ -113,19 +125,20 @@ export async function settleTest(testId) {
  * Claiming up front means a second click cannot double-queue the same sheet.
  */
 export async function claimPendingSheets(testId) {
+  const staleBefore = new Date(Date.now() - 10 * 60 * 1000);
   const pending = await db.test_submissions.findMany({
     where: {
       test_id: testId,
-      status: {
-        in: ["awaiting", "failed", "queued"],
-      },
-      storage_path: {
-        not: null,
-      },
+      storage_path: { not: null },
+      OR: [
+        { status: { in: ["awaiting", "failed", "queued"] } },
+        // A row can be stranded mid-"grading" by a crash between the attempt
+        // and its failure handler. Ten minutes is far past any single attempt,
+        // so reclaiming these cannot double-grade an active one.
+        { status: "grading", updated_at: { lt: staleBefore } },
+      ],
     },
-    select: {
-      id: true,
-    },
+    select: { id: true },
   });
   if (!pending.length) return [];
   await db.$transaction([

@@ -717,11 +717,13 @@ function EditTestDialog({ open, onClose, test, subjects }) {
     setSaving(true);
     try {
       await updateTest(test.id, {
-        title: title.trim() || undefined,
+        // null clears the field server-side; undefined would leave it as-is,
+        // making it impossible to ever remove a title or the grading notes.
+        title: title.trim() || null,
         test_date: date,
         subject_id: subjectId || null,
         max_marks: Number(maxMarks) || 100,
-        instructions: instructions.trim() || undefined,
+        instructions: instructions.trim() || null,
       });
       onClose();
       toast("Test updated", "success");

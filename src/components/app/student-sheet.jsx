@@ -11,13 +11,6 @@ import {
   markTone,
   MARK_TONE_CLASS,
 } from "@/lib/format";
-const TONE_TEXT = {
-  strong: "text-accent",
-  fine: "text-ink",
-  watch: "text-warn",
-  low: "text-danger",
-  none: "text-ink-4",
-};
 export function StudentSheet({ student, classroom, onClose }) {
   const confirm = useConfirm();
   const toast = useToast();

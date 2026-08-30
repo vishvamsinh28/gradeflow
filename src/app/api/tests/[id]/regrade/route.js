@@ -61,12 +61,14 @@ export const POST = route(async (request, { params }) => {
       },
     }),
   ]);
-  await inngest.send(
-    gradeRequested.create({
-      testId: id,
-      correction,
-    }),
-  );
+  try {
+    await inngest.send(gradeRequested.create({ testId: id, correction }));
+  } catch (error) {
+    // The rows are already re-queued; the Grade button re-claims them, so the
+    // work is not lost — but the teacher should hear the queue is down.
+    console.error("Could not reach the grading queue:", error);
+    throw new ApiError(503, "The grading queue is unreachable right now. Try again shortly.");
+  }
   return json(
     {
       status: "grading",

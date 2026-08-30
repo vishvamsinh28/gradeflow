@@ -50,6 +50,24 @@ export function route(handler) {
           },
         );
       }
+      // A unique-constraint hit is the caller's conflict, not a server error:
+      // renaming a subject onto an existing name, two tabs adding the same
+      // student code. P2025 is an update/delete racing a concurrent delete.
+      if (error?.code === "P2002") {
+        return NextResponse.json({ detail: "That name is already taken here." }, { status: 409 });
+      }
+      if (error?.code === "P2025") {
+        return NextResponse.json({ detail: "That no longer exists." }, { status: 404 });
+      }
+      // An unreachable database is an outage, not a bug — a paused Supabase
+      // project or a dead network. Say so, as a 503, instead of a mute 500.
+      if (isDatabaseDown(error)) {
+        console.error("Database unreachable:", error.message);
+        return NextResponse.json(
+          { detail: "GradeFlow cannot reach its database right now. Try again shortly." },
+          { status: 503 },
+        );
+      }
       console.error("Unhandled error in route handler:", error);
       return NextResponse.json(
         {
@@ -62,6 +80,25 @@ export function route(handler) {
     }
   };
 }
+function isDatabaseDown(error) {
+  for (let cause = error; cause; cause = cause.cause ?? cause.meta?.driverAdapterError) {
+    if (
+      cause.name === "DriverAdapterError" &&
+      /NotReachable|Timed?Out/i.test(String(cause.message))
+    ) {
+      return true;
+    }
+    if (
+      /Can't reach database server|ECONNREFUSED|ENETUNREACH|EHOSTUNREACH|ETIMEDOUT/.test(
+        String(cause.message),
+      )
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function describe(error) {
   const first = error.issues[0];
   if (!first) return "That request was not valid";

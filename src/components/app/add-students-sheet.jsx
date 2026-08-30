@@ -249,7 +249,12 @@ function ReviewTable({ students, note, existing, onChange, firstCode }) {
       />
     );
   }
-  let assigned = firstCode;
+  // Codes for the preview column, computed up front: mutating a counter while
+  // rendering breaks under StrictMode double-rendering.
+  let nextCode = firstCode;
+  const codes = students.map((student) =>
+    existing.has(student.name.toLowerCase()) ? "—" : `STU-${String(nextCode++).padStart(3, "0")}`,
+  );
   return (
     <div>
       <div className="flex items-center gap-2 border-b border-line bg-accent-soft/50 px-5 py-2.5 text-[12.5px] text-accent">
@@ -274,8 +279,7 @@ function ReviewTable({ students, note, existing, onChange, firstCode }) {
         <tbody>
           {students.map((student, index) => {
             const duplicate = existing.has(student.name.toLowerCase());
-            const code = duplicate ? "—" : `STU-${String(assigned).padStart(3, "0")}`;
-            if (!duplicate) assigned += 1;
+            const code = codes[index];
             return (
               <tr key={index} className="group/row">
                 <td
