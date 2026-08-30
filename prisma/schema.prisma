@@ -1,0 +1,172 @@
+// `prisma-client-js` emits compiled JavaScript into node_modules, which is what
+// a JavaScript app wants — the newer `prisma-client` generator writes
+// TypeScript sources into the source tree instead.
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7 takes connection URLs from prisma.config.ts and the driver adapter,
+// not from here.
+datasource db {
+  provider = "postgresql"
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model classroom_students {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  classroom_id     String             @db.Uuid
+  code             String
+  name             String
+  roll_no          String?
+  share_token      String             @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at       DateTime           @default(now()) @db.Timestamptz(6)
+  classrooms       classrooms         @relation(fields: [classroom_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  test_attendance  test_attendance[]
+  test_submissions test_submissions[]
+
+  @@unique([classroom_id, code])
+  @@index([classroom_id], map: "classroom_students_classroom_idx")
+  @@index([share_token], map: "classroom_students_share_idx")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model classrooms {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  owner_id           String               @db.Uuid
+  slug               String
+  name               String
+  description        String?
+  grade_scale        Json                 @default("[]")
+  created_at         DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime             @default(now()) @db.Timestamptz(6)
+  classroom_students classroom_students[]
+  users              users                @relation(fields: [owner_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  subjects           subjects[]
+  tests              tests[]
+
+  @@unique([owner_id, slug])
+  @@index([owner_id], map: "classrooms_owner_idx")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model subjects {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  classroom_id String     @db.Uuid
+  name         String
+  position     Int        @default(0)
+  created_at   DateTime   @default(now()) @db.Timestamptz(6)
+  classrooms   classrooms @relation(fields: [classroom_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tests        tests[]
+
+  @@unique([classroom_id, name])
+  @@index([classroom_id], map: "subjects_classroom_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model test_attendance {
+  test_id            String             @db.Uuid
+  student_id         String             @db.Uuid
+  mark               String             @default("present")
+  updated_at         DateTime           @default(now()) @db.Timestamptz(6)
+  classroom_students classroom_students @relation(fields: [student_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tests              tests              @relation(fields: [test_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([test_id, student_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model test_submissions {
+  id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  test_id            String             @db.Uuid
+  student_id         String             @db.Uuid
+  file_name          String?
+  storage_path       String?
+  mime_type          String?
+  source_page_from   Int?
+  source_page_to     Int?
+  matched_by_ai      Boolean            @default(false)
+  status             String             @default("awaiting")
+  score              Decimal?           @db.Decimal
+  out_of             Decimal?           @db.Decimal
+  summary            String?
+  questions          Json               @default("[]")
+  needs_review       Boolean            @default(false)
+  overridden         Boolean            @default(false)
+  error_message      String?
+  graded_at          DateTime?          @db.Timestamptz(6)
+  created_at         DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime           @default(now()) @db.Timestamptz(6)
+  classroom_students classroom_students @relation(fields: [student_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tests              tests              @relation(fields: [test_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([test_id, student_id])
+  @@index([student_id], map: "test_submissions_student_idx")
+  @@index([test_id], map: "test_submissions_test_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// The question paper, when the teacher has given one.
+///
+/// Optional: without it the model reads the questions off the student's own
+/// sheet, which is how this worked before. With it, marking is against the
+/// paper the teacher actually set — and `answer` sharpens that further.
+model test_questions {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  test_id    String   @db.Uuid
+  position   Int      @default(0)
+  label      String?
+  prompt     String
+  answer     String?
+  marks      Decimal  @default(1) @db.Decimal
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  tests      tests    @relation(fields: [test_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([test_id, position])
+}
+
+model tests {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  classroom_id     String             @db.Uuid
+  subject_id       String?            @db.Uuid
+  test_date        DateTime           @db.Date
+  title            String?
+  instructions     String?
+  max_marks        Decimal            @default(100) @db.Decimal
+  status           String             @default("collecting")
+  created_at       DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime           @default(now()) @db.Timestamptz(6)
+  test_attendance  test_attendance[]
+  test_questions   test_questions[]
+  test_submissions test_submissions[]
+  classrooms       classrooms         @relation(fields: [classroom_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  subjects         subjects?          @relation(fields: [subject_id], references: [id], onUpdate: NoAction)
+
+  @@index([classroom_id, test_date(sort: Desc)], map: "tests_classroom_idx")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model users {
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email         String       @unique
+  full_name     String
+  password_hash String
+  created_at    DateTime     @default(now()) @db.Timestamptz(6)
+  classrooms    classrooms[]
+}
+
+/// Fixed-window counters for rate-limited endpoints. Rows are disposable —
+/// anything older than the longest window can be deleted at any time.
+model rate_limits {
+  key          String
+  window_start DateTime @db.Timestamptz(6)
+  hits         Int      @default(1)
+
+  @@id([key, window_start])
+  @@index([window_start])
+}

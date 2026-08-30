@@ -4,25 +4,6 @@
 !.env.example
 !.env.*.example
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-.venv/
-venv/
-env/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-.coverage.*
-htmlcov/
-*.egg-info/
-build/
-dist/
-
 # Node / Next.js
 node_modules/
 .next/
@@ -52,6 +33,3 @@ tmp/
 
 # Alternate Next build outputs (NEXT_DIST_DIR)
 .next-*/
-
-# Pre-drop dump of the retired assignment/class tables — real student data.
-legacy-data-backup/
