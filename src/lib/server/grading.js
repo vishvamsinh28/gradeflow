@@ -40,10 +40,18 @@ export async function gradeOne({ submissionId, correction }) {
   });
   try {
     const content = await downloadSheet(submission.storage_path);
+    // With a paper, the sheet is out of what the paper's questions carry —
+    // which may be less than the test's ceiling. Without one, the ceiling is
+    // all there is.
+    const paperTotal = test.test_questions.reduce(
+      (sum, question) => sum + Number(question.marks),
+      0,
+    );
+    const outOf = test.test_questions.length ? paperTotal : Number(test.max_marks);
     const result = await gradeSheet(
       content,
       submission.mime_type || "application/pdf",
-      Number(test.max_marks),
+      outOf,
       test.instructions,
       correction,
       test.test_questions.map((question) => ({

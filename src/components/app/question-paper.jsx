@@ -41,7 +41,7 @@ export function usableQuestions(rows) {
  * and on the test page for a paper added or changed later. `extract` is the
  * only difference — before the test exists it runs against the classroom.
  */
-export function QuestionRowsEditor({ rows, onRows, extract }) {
+export function QuestionRowsEditor({ rows, onRows, extract, limit }) {
   const toast = useToast();
   const [mode, setMode] = useState("write");
   const [busy, setBusy] = useState(false);
@@ -180,8 +180,19 @@ export function QuestionRowsEditor({ rows, onRows, extract }) {
             <IconPlus size={13} /> Add a question
           </button>
 
-          <p className="mt-3 text-[12.5px] leading-relaxed text-ink-3">
-            The total comes from the marks here — {total > 0 ? `${total} so far` : "none yet"}.
+          <p
+            className={cx(
+              "mt-3 text-[12.5px] leading-relaxed",
+              limit && total > limit ? "font-medium text-danger" : "text-ink-3",
+            )}
+          >
+            {limit
+              ? total > limit
+                ? `These questions add up to ${total} marks — more than the test's total of ${limit}. Lower some marks, or raise the total.`
+                : `${total} of the test's ${limit} marks used.`
+              : total > 0
+                ? `${total} marks so far.`
+                : "No marks yet."}{" "}
             Leave the answers blank and the AI still marks the work; fill them in and it marks
             against yours.
           </p>
@@ -214,6 +225,7 @@ export function QuestionPaperSheet({ open, onClose, test, questions }) {
 
   const usable = usableQuestions(rows);
   const total = usable.reduce((sum, row) => sum + row.marks, 0);
+  const overLimit = total > Number(test.max_marks);
 
   async function commit() {
     setBusy(true);
@@ -241,15 +253,21 @@ export function QuestionPaperSheet({ open, onClose, test, questions }) {
       description={test.title ?? "Untitled test"}
       footer={
         <>
-          <span className="mr-auto text-[12.5px] text-ink-3">
+          <span className={cx("mr-auto text-[12.5px]", overLimit ? "text-danger" : "text-ink-3")}>
             {usable.length > 0
-              ? `${pluralize(usable.length, "question")} · ${total} marks`
+              ? `${pluralize(usable.length, "question")} · ${total} of ${Number(test.max_marks)} marks`
               : "Optional — without it the AI reads the questions off each sheet"}
           </span>
           <Button size="sm" onClick={onClose}>
             Cancel
           </Button>
-          <Button size="sm" variant="primary" loading={busy} onClick={() => void commit()}>
+          <Button
+            size="sm"
+            variant="primary"
+            loading={busy}
+            disabled={overLimit}
+            onClick={() => void commit()}
+          >
             Save paper
           </Button>
         </>
@@ -259,6 +277,7 @@ export function QuestionPaperSheet({ open, onClose, test, questions }) {
         <QuestionRowsEditor
           rows={rows}
           onRows={setRows}
+          limit={Number(test.max_marks)}
           extract={(file) => extractQuestions(test.id, file)}
         />
       </div>

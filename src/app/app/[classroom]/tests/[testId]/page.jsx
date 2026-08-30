@@ -806,13 +806,12 @@ function EditTestDialog({ open, onClose, test, subjects, hasPaper }) {
           <Field
             label="Total marks"
             optional
-            hint={hasPaper ? "Set by the question paper." : undefined}
+            hint={hasPaper ? "Cannot go below what the paper's questions add up to." : undefined}
           >
             <Input
               type="number"
               min={1}
               value={maxMarks}
-              disabled={hasPaper}
               onChange={(event) => setMaxMarks(event.target.value)}
             />
           </Field>

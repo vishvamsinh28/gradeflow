@@ -83,10 +83,20 @@ export const PATCH = route(async (request, { params }) => {
   if (input.title !== undefined) data.title = input.title?.trim() || null;
   if (input.instructions !== undefined) data.instructions = input.instructions?.trim() || null;
   if (input.max_marks != null) {
-    // Once a paper exists, its marks are the total — a hand-edited number here
-    // would let question marks disagree with the test total.
-    const questionCount = await db.test_questions.count({ where: { test_id: id } });
-    if (!questionCount) data.max_marks = input.max_marks;
+    // The total is the teacher's, but it cannot drop below what the paper's
+    // questions already add up to.
+    const questions = await db.test_questions.findMany({
+      where: { test_id: id },
+      select: { marks: true },
+    });
+    const paperTotal = questions.reduce((sum, row) => sum + Number(row.marks), 0);
+    if (input.max_marks < paperTotal) {
+      throw new ApiError(
+        422,
+        `The paper's questions add up to ${paperTotal} marks — the total cannot be lower than that.`,
+      );
+    }
+    data.max_marks = input.max_marks;
   }
   data.subjects = input.subject_id
     ? {

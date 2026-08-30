@@ -1,6 +1,6 @@
 import { db } from "@/lib/server/db";
 import { requireUser } from "@/lib/server/auth";
-import { body, json, route } from "@/lib/server/http";
+import { ApiError, body, json, route } from "@/lib/server/http";
 import { ownedTest, questionPayload } from "@/lib/server/domain";
 import { questionsSchema } from "@/lib/server/schemas";
 
@@ -9,13 +9,13 @@ import { questionsSchema } from "@/lib/server/schemas";
  *
  * The editor is a list the teacher rearranges, renumbers and deletes rows from,
  * so a diff of individual creates and deletes would be more moving parts for no
- * gain. `max_marks` follows the paper: once questions exist, the total is their
- * sum rather than something to keep in step by hand.
+ * gain. The test's total is the teacher's ceiling: the paper must fit inside
+ * it, never redefine it.
  */
 export const PUT = route(async (request, { params }) => {
   const user = await requireUser(request);
   const { id } = await params;
-  await ownedTest(id, user.id);
+  const { test } = await ownedTest(id, user.id);
   const { questions } = await body(request, questionsSchema);
 
   const rows = questions.map((question, position) => ({
@@ -28,18 +28,18 @@ export const PUT = route(async (request, { params }) => {
   }));
 
   const total = rows.reduce((sum, row) => sum + row.marks, 0);
+  const ceiling = Number(test.max_marks);
+  if (total > ceiling) {
+    throw new ApiError(
+      422,
+      `These questions add up to ${total} marks — more than the test's total of ${ceiling}. ` +
+        "Lower the question marks, or raise the test's total first.",
+    );
+  }
 
   await db.$transaction([
     db.test_questions.deleteMany({ where: { test_id: id } }),
     ...(rows.length ? [db.test_questions.createMany({ data: rows })] : []),
-    ...(total > 0
-      ? [
-          db.tests.update({
-            where: { id },
-            data: { max_marks: total, updated_at: new Date() },
-          }),
-        ]
-      : []),
   ]);
 
   return json(

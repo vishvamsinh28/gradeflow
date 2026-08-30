@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/server/auth";
 import { ApiError, body, json, route } from "@/lib/server/http";
 import { ownedTest } from "@/lib/server/domain";
 import { gradeRequested, inngest } from "@/lib/server/inngest/client";
+import { claimPendingSheets, gradeOne } from "@/lib/server/grading";
 import { regradeSchema } from "@/lib/server/schemas";
 
 /**
@@ -61,13 +62,29 @@ export const POST = route(async (request, { params }) => {
       },
     }),
   ]);
-  try {
-    await inngest.send(gradeRequested.create({ testId: id, correction }));
-  } catch (error) {
-    // The rows are already re-queued; the Grade button re-claims them, so the
-    // work is not lost — but the teacher should hear the queue is down.
-    console.error("Could not reach the grading queue:", error);
-    throw new ApiError(503, "The grading queue is unreachable right now. Try again shortly.");
+  // Small re-marks run right here; only real batches go to the queue — which
+  // fails silently when configured-but-unsynced, so it is never trusted with
+  // work this request could do itself.
+  if (targets.length <= 3) {
+    const jobs = await claimPendingSheets(id);
+    for (const job of jobs) {
+      try {
+        await gradeOne({ ...job, correction });
+      } catch (inlineError) {
+        console.error("Inline re-mark failed for", job.submissionId, inlineError);
+      }
+    }
+  } else {
+    try {
+      await inngest.send(gradeRequested.create({ testId: id, correction }));
+    } catch (error) {
+      console.error("Could not reach the grading queue:", error);
+      throw new ApiError(
+        503,
+        `${targets.length} sheets need the grading queue, which is unreachable. ` +
+          "Locally, run `npx inngest-cli dev`; in production, sync the Inngest app.",
+      );
+    }
   }
   return json(
     {
@@ -77,3 +94,6 @@ export const POST = route(async (request, { params }) => {
     202,
   );
 });
+
+// Inline re-marking is up to three model calls back to back.
+export const maxDuration = 60;

@@ -212,14 +212,11 @@ export function CreateTestDialog({ open, onClose, classroom }) {
     setPaperOpen(false);
     setRows([]);
   }, [open, classroom]);
-  // The paper owns the total once it has questions; the manual box owns it
-  // until then.
+  // The teacher's total is the ceiling; the paper has to fit inside it.
   const paper = useMemo(() => usableQuestions(rows), [rows]);
   const paperTotal = paper.reduce((sum, question) => sum + question.marks, 0);
-  const marks = useMemo(
-    () => (paper.length > 0 ? paperTotal : Number(maxMarks) || 100),
-    [paper.length, paperTotal, maxMarks],
-  );
+  const marks = useMemo(() => Number(maxMarks) || 100, [maxMarks]);
+  const paperOverLimit = paperTotal > marks;
   const [saving, setSaving] = useState(false);
   async function submit() {
     if (!classroom || !date || saving) return;
@@ -278,7 +275,7 @@ export function CreateTestDialog({ open, onClose, classroom }) {
             variant="primary"
             loading={saving}
             onClick={() => void submit()}
-            disabled={!date}
+            disabled={!date || paperOverLimit}
           >
             Create test
           </Button>
@@ -327,14 +324,15 @@ export function CreateTestDialog({ open, onClose, classroom }) {
           <Field
             label="Total marks"
             optional
-            hint={paper.length > 0 ? "Set by the question paper." : undefined}
+            hint={paper.length > 0 ? `${paperTotal} of ${marks} used by the paper.` : undefined}
           >
             <Input
               type="number"
               min={1}
-              value={paper.length > 0 ? String(paperTotal) : maxMarks}
-              disabled={paper.length > 0}
+              value={maxMarks}
               onChange={(event) => setMaxMarks(event.target.value)}
+              aria-invalid={paperOverLimit}
+              className={paperOverLimit ? "border-danger" : undefined}
             />
           </Field>
         </div>
@@ -354,9 +352,9 @@ export function CreateTestDialog({ open, onClose, classroom }) {
               Question paper
               <span className="ml-1.5 font-normal text-ink-4">Optional</span>
             </span>
-            <span className="text-[12.5px] text-ink-3">
+            <span className={cx("text-[12.5px]", paperOverLimit ? "text-danger" : "text-ink-3")}>
               {paper.length > 0
-                ? `${paper.length} question${paper.length === 1 ? "" : "s"} · ${paperTotal} marks`
+                ? `${paper.length} question${paper.length === 1 ? "" : "s"} · ${paperTotal} of ${marks} marks`
                 : paperOpen
                   ? "Hide"
                   : "Write it or photograph it"}
@@ -367,6 +365,7 @@ export function CreateTestDialog({ open, onClose, classroom }) {
               <QuestionRowsEditor
                 rows={rows}
                 onRows={setRows}
+                limit={marks}
                 extract={(file) => extractQuestionsForClassroom(classroom.id, file)}
               />
             </div>
